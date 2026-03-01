@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "opencv-python>=4.13.0.92",
-    "transformers>=4.47.0",
+    "transformers>=4.47.0,<5",
     "gradio>=4.0.0",
     "accelerate>=0.20.0",
     "pycocotools>=2.0.0",
@@ -17,6 +17,7 @@ dependencies = [
     "ultralytics>=8.0.0",
     "tqdm>=4.66.0",
     "autodistill-grounded-edgesam>=0.1.0",
+    "autodistill-grounded-sam>=0.1.0",
     "autodistill-grounding-dino>=0.1.0",
     "scikit-learn>=1.0.0",
     "roboflow>=1.0.0",

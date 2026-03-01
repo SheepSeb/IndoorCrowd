@@ -1,7 +1,7 @@
-"""Gradio app for reviewing and editing SAM3-generated COCO annotations.
+"""Gradio app for reviewing and editing COCO annotations.
 
-Loads per-scene annotation files from:
-    dataset/labels/{split}/{scene}.json
+Loads per-scene annotation files from a selected annotation source or
+from custom paths provided via CLI arguments.
 
 Interaction:
   - Click on an annotation to delete it (default mode)
@@ -70,7 +70,20 @@ document.addEventListener('keydown', handleKeyboard, false);
 """
 
 _sam3: dict = {"model": None, "processor": None}
+_fastsam: dict = {"model": None, "model_path": None}
 _device = "cuda" if torch.cuda.is_available() else "cpu"
+
+ANNOTATION_SOURCE_PATHS: dict[str, tuple[Path, Path]] = {
+    "sam3_3fps": (Path("dataset/labels_3fps"), Path("dataset/raw_frames_3fps")),
+    "grounded_sam_3fps": (
+        Path("dataset/labels_grounding_sam_3fps"),
+        Path("dataset/raw_frames_3fps"),
+    ),
+    "efficient_grounded_sam_3fps": (
+        Path("dataset/labels_efficient_grounded_sam_3fps"),
+        Path("dataset/raw_frames_3fps"),
+    ),
+}
 
 
 def load_sam3(model_id: str = "facebook/sam3"):
@@ -83,6 +96,18 @@ def load_sam3(model_id: str = "facebook/sam3"):
         _sam3["processor"] = Sam3Processor.from_pretrained(model_id, token=hf_token)
         gr.Info("SAM3 ready.")
     return _sam3["model"], _sam3["processor"]
+
+
+def load_fastsam(model_path: str = "FastSAM-s.pt"):
+    """Lazy-load FastSAM for faster interactive click-based segmentation."""
+    if _fastsam["model"] is None or _fastsam["model_path"] != model_path:
+        from ultralytics import FastSAM
+
+        gr.Info(f"Loading FastSAM ({model_path}) (first time only) ...")
+        _fastsam["model"] = FastSAM(model_path)
+        _fastsam["model_path"] = model_path
+        gr.Info("FastSAM ready.")
+    return _fastsam["model"]
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +173,18 @@ def ann_at_point(anns: list[dict], x: int, y: int, h: int, w: int) -> dict | Non
             if area < best_area:
                 best, best_area = ann, area
     return best
+
+
+def anns_at_point(anns: list[dict], x: int, y: int, h: int, w: int) -> list[dict]:
+    """Return all annotations containing (x, y), smallest area first."""
+    hits: list[tuple[float, dict]] = []
+    for ann in anns:
+        mask = decode_seg(ann["segmentation"], h, w)
+        if y < mask.shape[0] and x < mask.shape[1] and mask[y, x] > 0:
+            area = ann.get("area", float(mask.sum()))
+            hits.append((float(area), ann))
+    hits.sort(key=lambda t: t[0])
+    return [ann for _, ann in hits]
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +355,7 @@ class Reviewer:
 # Gradio app
 # ---------------------------------------------------------------------------
 
-def build_app(rev: Reviewer, model_id: str):
+def build_app(rev: Reviewer, model_id: str, fastsam_model: str):
     if not rev.splits:
         with gr.Blocks() as app:
             gr.Markdown(
@@ -350,10 +387,10 @@ def build_app(rev: Reviewer, model_id: str):
     first_split = rev.splits[0]
     first_scenes = rev.scenes_for(first_split)
 
-    with gr.Blocks(title="SAM3 Annotation Reviewer") as app:
+    with gr.Blocks(title="COCO Annotation Reviewer") as app:
 
         # ---- top bar ----
-        gr.Markdown("# SAM3 Annotation Reviewer")
+        gr.Markdown("# COCO Annotation Reviewer")
         with gr.Row():
             split_dd = gr.Dropdown(
                 rev.splits, value=first_split, label="Split", scale=1,
@@ -386,12 +423,59 @@ def build_app(rev: Reviewer, model_id: str):
             with gr.Column(scale=1, min_width=260):
                 stats_md = gr.Markdown(rev.stats_text)
                 gr.Markdown("---")
-                gr.Markdown("### Mode")
-                add_toggle = gr.Checkbox(label="Add mode (click to add person)", value=False)
+                gr.Markdown("### Click Action")
+                click_action = gr.Radio(
+                    choices=["Remove", "Add segmentation"],
+                    value="Remove",
+                    label="What click does",
+                )
+                add_backend = gr.Radio(
+                    choices=["FastSAM", "SAM3"],
+                    value="FastSAM",
+                    label="Add backend",
+                )
+                remove_all_hits = gr.Checkbox(
+                    label="Remove all overlapping annotations at click",
+                    value=False,
+                )
+                add_prompt = gr.Textbox(
+                    label="Add prompt (SAM3 text prompt)",
+                    value="person",
+                    placeholder="e.g. person, backpack, bicycle",
+                )
+                add_threshold = gr.Slider(
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.3,
+                    step=0.01,
+                    label="Add detection threshold",
+                )
+                add_mask_threshold = gr.Slider(
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.5,
+                    step=0.01,
+                    label="Add mask threshold",
+                )
+                fastsam_iou = gr.Slider(
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.9,
+                    step=0.01,
+                    label="FastSAM IoU threshold",
+                )
+                fastsam_imgsz = gr.Slider(
+                    minimum=256,
+                    maximum=1536,
+                    value=1024,
+                    step=32,
+                    label="FastSAM image size",
+                )
                 gr.Markdown(
-                    "**Default**: click an annotation to **delete** it.\n\n"
-                    "**Add mode**: click on a missed person to **add** an "
-                    "annotation via SAM3.\n\n"
+                    "**Remove**: click an annotation to delete it.\n\n"
+                    "**Add segmentation**: click a missed object to add a new "
+                    "segmentation. The app uses the selected backend and picks the "
+                    "best mask at (or nearest to) the clicked point.\n\n"
                     "**Left / Right** arrow keys to navigate, **Enter** to save."
                 )
 
@@ -445,7 +529,17 @@ def build_app(rev: Reviewer, model_id: str):
                 gr.Info("Nothing to save.")
             return status, stats
 
-        def on_click(evt: gr.SelectData, add_enabled):
+        def on_click(
+            evt: gr.SelectData,
+            action: str,
+            backend: str,
+            remove_all: bool,
+            text_prompt: str,
+            threshold: float,
+            mask_threshold: float,
+            fs_iou: float,
+            fs_imgsz: float,
+        ):
             info = rev.img_info
             if not info:
                 return gr.update(), gr.update(), gr.update()
@@ -455,12 +549,18 @@ def build_app(rev: Reviewer, model_id: str):
             x = min(max(int(x), 0), w - 1)
             y = min(max(int(y), 0), h - 1)
 
-            if not add_enabled:
+            if action == "Remove":
                 anns = rev.anns_for_current()
-                hit = ann_at_point(anns, x, y, h, w)
-                if hit:
-                    rev.delete_anns({hit["id"]})
-                    gr.Info(f"Deleted annotation #{hit['id']}")
+                hits = anns_at_point(anns, x, y, h, w)
+                if hits:
+                    if remove_all:
+                        ids = {ann["id"] for ann in hits}
+                        rev.delete_anns(ids)
+                        gr.Info(f"Deleted {len(ids)} annotation(s) at click.")
+                    else:
+                        hit = hits[0]
+                        rev.delete_anns({hit["id"]})
+                        gr.Info(f"Deleted annotation #{hit['id']}")
                 else:
                     gr.Warning("No annotation at this location.")
                 vis, status, stats = _refresh()
@@ -470,25 +570,44 @@ def build_app(rev: Reviewer, model_id: str):
             if img_rgb is None:
                 return gr.update(), gr.update(), gr.update()
 
-            pil_img = Image.fromarray(img_rgb)
-            model, processor = load_sam3(model_id)
+            prompt = (text_prompt or "").strip() or "person"
+            masks = []
+            boxes = []
+            scores = []
 
-            inputs = processor(
-                images=pil_img, text="person", return_tensors="pt",
-            ).to(_device)
-            with torch.no_grad():
-                outputs = model(**inputs)
-
-            results = processor.post_process_instance_segmentation(
-                outputs,
-                threshold=0.3,
-                mask_threshold=0.5,
-                target_sizes=inputs.get("original_sizes").tolist(),
-            )[0]
-
-            masks = results.get("masks", [])
-            boxes = results.get("boxes", [])
-            scores = results.get("scores", [])
+            if backend == "FastSAM":
+                fastsam = load_fastsam(fastsam_model)
+                preds = fastsam(
+                    img_rgb,
+                    device=_device,
+                    verbose=False,
+                    retina_masks=True,
+                    conf=float(threshold),
+                    iou=float(fs_iou),
+                    imgsz=int(fs_imgsz),
+                )
+                res = preds[0]
+                if res.masks is not None and res.boxes is not None:
+                    masks = [m for m in res.masks.data]
+                    boxes = [b for b in res.boxes.xyxy]
+                    scores = [s for s in res.boxes.conf]
+            else:
+                pil_img = Image.fromarray(img_rgb)
+                model, processor = load_sam3(model_id)
+                inputs = processor(
+                    images=pil_img, text=prompt, return_tensors="pt",
+                ).to(_device)
+                with torch.no_grad():
+                    outputs = model(**inputs)
+                results = processor.post_process_instance_segmentation(
+                    outputs,
+                    threshold=float(threshold),
+                    mask_threshold=float(mask_threshold),
+                    target_sizes=inputs.get("original_sizes").tolist(),
+                )[0]
+                masks = results.get("masks", [])
+                boxes = results.get("boxes", [])
+                scores = results.get("scores", [])
 
             best, best_score = None, -1.0
             for m, b, s in zip(masks, boxes, scores):
@@ -515,9 +634,17 @@ def build_app(rev: Reviewer, model_id: str):
 
             if best:
                 rev.add_ann(best[0], best[1], best[2])
-                gr.Info(f"Added annotation (score {best[2]:.3f})")
+                if backend == "FastSAM":
+                    gr.Info(f"Added annotation via FastSAM (score {best[2]:.3f})")
+                else:
+                    gr.Info(f"Added annotation via SAM3 (score {best[2]:.3f}, prompt='{prompt}')")
             else:
-                gr.Warning("No person detected at this location.")
+                if backend == "FastSAM":
+                    gr.Warning("No object detected at this location by FastSAM.")
+                else:
+                    gr.Warning(
+                        f"No object detected at this location for prompt '{prompt}'."
+                    )
 
             vis, status, stats = _refresh()
             return vis, status, stats
@@ -533,15 +660,46 @@ def build_app(rev: Reviewer, model_id: str):
         prev_btn.click(on_prev, [], [slider, img_out, status_md, stats_md])
         next_btn.click(on_next, [], [slider, img_out, status_md, stats_md])
         save_btn.click(on_save, [], [status_md, stats_md])
-        img_out.select(on_click, [add_toggle], [img_out, status_md, stats_md])
+        img_out.select(
+            on_click,
+            [
+                click_action,
+                add_backend,
+                remove_all_hits,
+                add_prompt,
+                add_threshold,
+                add_mask_threshold,
+                fastsam_iou,
+                fastsam_imgsz,
+            ],
+            [img_out, status_md, stats_md],
+        )
         app.load(initial_load, [], [img_out, status_md, stats_md])
 
     return app
 
 
+def resolve_paths(
+    annotation_source: str, labels_dir: Path, raw_frames_dir: Path
+) -> tuple[Path, Path]:
+    """Resolve labels/raw-frame paths from a source preset or custom values."""
+    if annotation_source == "custom":
+        return labels_dir, raw_frames_dir
+    return ANNOTATION_SOURCE_PATHS[annotation_source]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Gradio app for reviewing / editing COCO annotations"
+    )
+    parser.add_argument(
+        "--annotation-source",
+        choices=["custom", *ANNOTATION_SOURCE_PATHS.keys()],
+        default="custom",
+        help=(
+            "Pick a known annotation source preset. Use 'custom' to rely on "
+            "--labels-dir and --raw-frames-dir."
+        ),
     )
     parser.add_argument(
         "--labels-dir", type=Path, default=Path("dataset/labels"),
@@ -550,12 +708,25 @@ def main():
         "--raw-frames-dir", type=Path, default=Path("dataset/raw_frames"),
     )
     parser.add_argument("--model-id", type=str, default="facebook/sam3")
+    parser.add_argument(
+        "--fastsam-model",
+        type=str,
+        default="FastSAM-s.pt",
+        help="FastSAM weights path/name for fast click-based segmentation.",
+    )
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--share", action="store_true")
     args = parser.parse_args()
 
-    rev = Reviewer(args.labels_dir, args.raw_frames_dir)
-    app = build_app(rev, args.model_id)
+    labels_dir, raw_frames_dir = resolve_paths(
+        args.annotation_source, args.labels_dir, args.raw_frames_dir
+    )
+    print(f"Annotation source: {args.annotation_source}")
+    print(f"Labels dir: {labels_dir}")
+    print(f"Raw frames dir: {raw_frames_dir}")
+
+    rev = Reviewer(labels_dir, raw_frames_dir)
+    app = build_app(rev, args.model_id, args.fastsam_model)
     app.launch(
         server_port=args.port,
         share=args.share,

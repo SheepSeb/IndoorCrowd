@@ -10,3 +10,4 @@ wheels/
 .venv
 dataset/
 .env
+*.pt
