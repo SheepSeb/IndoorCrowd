@@ -78,6 +78,9 @@ class Session:
         self.anns_by_file: dict[str, list[dict]] = {}
         self.next_ann_id = 1
         self.started = datetime.now()
+        self.pos_points_by_file: dict[str, list[tuple[int, int]]] = {}
+        self.neg_points_by_file: dict[str, list[tuple[int, int]]] = {}
+        self.poly_points_by_file: dict[str, list[tuple[int, int]]] = {}
 
     def load(self, images_dir: Path, output_json: Path):
         self.images_dir = images_dir.resolve()
@@ -85,6 +88,9 @@ class Session:
         self.images = collect_images(self.images_dir)
         self.idx = 0
         self.anns_by_file = {}
+        self.pos_points_by_file = {}
+        self.neg_points_by_file = {}
+        self.poly_points_by_file = {}
         self.next_ann_id = 1
         if self.output_json.exists():
             self._load_existing(self.output_json)
@@ -127,7 +133,52 @@ class Session:
             return []
         return self.anns_by_file.get(rel, [])
 
-    def add_ann(self, mask: np.ndarray, bbox_xywh: list[float], score: float):
+    def points_current(self) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        rel = self.current_rel_file()
+        if rel is None:
+            return [], []
+        return self.pos_points_by_file.get(rel, []), self.neg_points_by_file.get(rel, [])
+
+    def add_point_current(self, x: int, y: int, positive: bool):
+        rel = self.current_rel_file()
+        if rel is None:
+            return
+        points_map = self.pos_points_by_file if positive else self.neg_points_by_file
+        points = points_map.setdefault(rel, [])
+        points.append((x, y))
+
+    def clear_points_current(self):
+        rel = self.current_rel_file()
+        if rel is None:
+            return
+        self.pos_points_by_file[rel] = []
+        self.neg_points_by_file[rel] = []
+
+    def polygon_points_current(self) -> list[tuple[int, int]]:
+        rel = self.current_rel_file()
+        if rel is None:
+            return []
+        return self.poly_points_by_file.get(rel, [])
+
+    def add_polygon_point_current(self, x: int, y: int):
+        rel = self.current_rel_file()
+        if rel is None:
+            return
+        self.poly_points_by_file.setdefault(rel, []).append((x, y))
+
+    def clear_polygon_points_current(self):
+        rel = self.current_rel_file()
+        if rel is None:
+            return
+        self.poly_points_by_file[rel] = []
+
+    def add_ann(
+        self,
+        mask: np.ndarray,
+        bbox_xywh: list[float],
+        score: float,
+        segmentation: dict | list | None = None,
+    ):
         rel = self.current_rel_file()
         if rel is None:
             return
@@ -137,7 +188,7 @@ class Session:
             "category_id": 1,
             "bbox": [round(float(v), 2) for v in bbox_xywh],
             "area": round(float(mask.sum()), 2),
-            "segmentation": encode_rle(mask),
+            "segmentation": encode_rle(mask) if segmentation is None else segmentation,
             "score": round(float(score), 4),
             "iscrowd": 0,
         }
@@ -213,6 +264,32 @@ def render(img: np.ndarray, anns: list[dict]) -> np.ndarray:
     return vis
 
 
+def draw_points(vis: np.ndarray, pos_points: list[tuple[int, int]], neg_points: list[tuple[int, int]]) -> np.ndarray:
+    out = vis.copy()
+    for x, y in pos_points:
+        cv2.circle(out, (x, y), 6, (60, 220, 80), -1)
+        cv2.circle(out, (x, y), 9, (255, 255, 255), 2)
+    for x, y in neg_points:
+        cv2.circle(out, (x, y), 6, (230, 70, 70), -1)
+        cv2.circle(out, (x, y), 9, (255, 255, 255), 2)
+        cv2.line(out, (x - 5, y - 5), (x + 5, y + 5), (255, 255, 255), 2)
+        cv2.line(out, (x - 5, y + 5), (x + 5, y - 5), (255, 255, 255), 2)
+    return out
+
+
+def draw_polygon_preview(vis: np.ndarray, poly_points: list[tuple[int, int]]) -> np.ndarray:
+    out = vis.copy()
+    if not poly_points:
+        return out
+    pts = np.array(poly_points, dtype=np.int32)
+    cv2.polylines(out, [pts], isClosed=False, color=(80, 180, 255), thickness=2)
+    for i, (x, y) in enumerate(poly_points):
+        cv2.circle(out, (x, y), 5, (80, 180, 255), -1)
+        cv2.circle(out, (x, y), 8, (255, 255, 255), 2)
+        cv2.putText(out, str(i + 1), (x + 8, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+    return out
+
+
 def build_app(session: Session):
     with gr.Blocks(title="FastSAM Segmentation Assistant") as app:
         gr.Markdown("# FastSAM Segmentation Assistant")
@@ -234,10 +311,14 @@ def build_app(session: Session):
                 status_md = gr.Markdown("")
             with gr.Column(scale=1):
                 click_action = gr.Radio(
-                    choices=["Add segmentation", "Remove"],
-                    value="Add segmentation",
+                    choices=["Add positive point", "Add negative point", "Add polygon vertex", "Remove"],
+                    value="Add positive point",
                     label="Click action",
                 )
+                apply_prompt_btn = gr.Button("Apply point prompt", variant="primary")
+                clear_points_btn = gr.Button("Clear points")
+                finalize_polygon_btn = gr.Button("Finalize polygon", variant="primary")
+                clear_polygon_btn = gr.Button("Clear polygon")
                 remove_all = gr.Checkbox(label="Remove all overlapping at click", value=False)
                 conf = gr.Slider(0.0, 1.0, value=0.25, step=0.01, label="FastSAM conf")
                 iou = gr.Slider(0.0, 1.0, value=0.9, step=0.01, label="FastSAM IoU")
@@ -250,8 +331,16 @@ def build_app(session: Session):
                 return blank, "No folder loaded."
             anns = session.anns_current()
             vis = render(img, anns)
+            pos_points, neg_points = session.points_current()
+            vis = draw_points(vis, pos_points, neg_points)
+            poly_points = session.polygon_points_current()
+            vis = draw_polygon_preview(vis, poly_points)
             rel = session.current_rel_file()
-            return vis, f"`{rel}` — image {session.idx + 1}/{len(session.images)} — anns: {len(anns)}"
+            return (
+                vis,
+                f"`{rel}` — image {session.idx + 1}/{len(session.images)} — anns: {len(anns)}"
+                f" — +pts: {len(pos_points)} — -pts: {len(neg_points)} — poly pts: {len(poly_points)}",
+            )
 
         def on_load(images_dir: str, out_json: str):
             if not images_dir or not out_json:
@@ -279,7 +368,9 @@ def build_app(session: Session):
             vis, status = refresh()
             return gr.update(value=session.idx), vis, status
 
-        def on_click(evt: gr.SelectData, action: str, rm_all: bool, conf_v: float, iou_v: float, imgsz_v: float):
+        def on_click(
+            evt: gr.SelectData, action: str, rm_all: bool, conf_v: float, iou_v: float, imgsz_v: float
+        ):
             img = session.current_image()
             if img is None:
                 return gr.update(), "No folder loaded."
@@ -294,6 +385,23 @@ def build_app(session: Session):
                     gr.Info(f"Deleted {deleted} annotation(s).")
                 else:
                     gr.Warning("No annotation at click point.")
+                return refresh()
+            if action == "Add polygon vertex":
+                session.add_polygon_point_current(x=x, y=y)
+                return refresh()
+            if action == "Add negative point":
+                session.add_point_current(x=x, y=y, positive=False)
+                return refresh()
+            session.add_point_current(x=x, y=y, positive=True)
+            return on_apply_prompt(conf_v=conf_v, iou_v=iou_v, imgsz_v=imgsz_v)
+
+        def on_apply_prompt(conf_v: float, iou_v: float, imgsz_v: float):
+            img = session.current_image()
+            if img is None:
+                return gr.update(), "No folder loaded."
+            pos_points, neg_points = session.points_current()
+            if not pos_points:
+                gr.Warning("Add at least one positive point first.")
                 return refresh()
 
             preds = session.fastsam(
@@ -317,28 +425,58 @@ def build_app(session: Session):
             best = None
             best_score = -1.0
             for m, b, s in zip(masks, boxes, scores):
-                if m[y, x] > 0 and s > best_score:
+                # Keep only masks that include all positive points and no negative points.
+                if any(m[py, px] == 0 for px, py in pos_points):
+                    continue
+                if any(m[ny, nx] > 0 for nx, ny in neg_points):
+                    continue
+                if s > best_score:
                     best = (m, b, s)
                     best_score = s
 
-            if best is None and masks:
-                min_dist = float("inf")
-                for m, b, s in zip(masks, boxes, scores):
-                    ys, xs = np.where(m > 0)
-                    if len(xs) == 0:
-                        continue
-                    dist = float(np.min((xs - x) ** 2 + (ys - y) ** 2))
-                    if dist < min_dist:
-                        min_dist = dist
-                        best = (m, b, s)
-
             if best is None:
-                gr.Warning("No suitable segmentation found near click.")
+                gr.Warning("No segmentation satisfies all prompt points.")
                 return refresh()
 
             mask, box_xyxy, score = best
             session.add_ann(mask=mask, bbox_xywh=xyxy_to_xywh(box_xyxy), score=score)
+            session.clear_points_current()
             gr.Info(f"Added annotation (score {score:.3f})")
+            return refresh()
+
+        def on_clear_points():
+            session.clear_points_current()
+            return refresh()
+
+        def on_finalize_polygon():
+            img = session.current_image()
+            if img is None:
+                return gr.update(), "No folder loaded."
+            h, w = img.shape[:2]
+            poly_points = session.polygon_points_current()
+            if len(poly_points) < 3:
+                gr.Warning("Add at least 3 polygon points.")
+                return refresh()
+
+            pts = np.array(poly_points, dtype=np.int32).reshape((-1, 1, 2))
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillPoly(mask, [pts], color=1)
+            ys, xs = np.where(mask > 0)
+            if len(xs) == 0:
+                gr.Warning("Polygon produced an empty mask.")
+                return refresh()
+            x1, x2 = int(xs.min()), int(xs.max())
+            y1, y2 = int(ys.min()), int(ys.max())
+            bbox_xywh = [float(x1), float(y1), float(x2 - x1 + 1), float(y2 - y1 + 1)]
+            segmentation = [[coord for x, y in poly_points for coord in (float(x), float(y))]]
+
+            session.add_ann(mask=mask, bbox_xywh=bbox_xywh, score=1.0, segmentation=segmentation)
+            session.clear_polygon_points_current()
+            gr.Info("Added polygon annotation.")
+            return refresh()
+
+        def on_clear_polygon():
+            session.clear_polygon_points_current()
             return refresh()
 
         def on_save():
@@ -352,6 +490,10 @@ def build_app(session: Session):
         prev_btn.click(on_prev, [], [frame_slider, image_out, status_md])
         next_btn.click(on_next, [], [frame_slider, image_out, status_md])
         image_out.select(on_click, [click_action, remove_all, conf, iou, imgsz], [image_out, status_md])
+        apply_prompt_btn.click(on_apply_prompt, [conf, iou, imgsz], [image_out, status_md])
+        clear_points_btn.click(on_clear_points, [], [image_out, status_md])
+        finalize_polygon_btn.click(on_finalize_polygon, [], [image_out, status_md])
+        clear_polygon_btn.click(on_clear_polygon, [], [image_out, status_md])
         save_btn.click(on_save, [], [status_md])
 
     return app
