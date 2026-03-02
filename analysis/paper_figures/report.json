@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "common_images": 50,
+    "bbox_iou_threshold": 0.5,
+    "splits": [
+      "challange",
+      "test",
+      "train"
+    ],
+    "label_dirs": {
+      "SAM3": "dataset/labels_3fps",
+      "GroundingSAM": "dataset/labels_grounding_sam_3fps",
+      "EfficientGroundingSAM": "dataset/labels_efficient_grounded_sam_3fps"
+    }
+  },
+  "per_model": {
+    "SAM3": {
+      "n_images": 50,
+      "n_images_non_empty": 50,
+      "detection_rate": 1.0,
+      "total_annotations": 538,
+      "annotations_per_image": {
+        "mean": 10.76,
+        "median": 9.0,
+        "stdev": 3.815,
+        "min": 4,
+        "max": 18
+      },
+      "annotation_area_fraction": {
+        "mean": 0.00438,
+        "median": 0.00387,
+        "stdev": 0.00265
+      },
+      "size_class_counts": {
+        "small": 37,
+        "medium": 482,
+        "large": 19
+      }
+    },
+    "GroundingSAM": {
+      "n_images": 50,
+      "n_images_non_empty": 50,
+      "detection_rate": 1.0,
+      "total_annotations": 401,
+      "annotations_per_image": {
+        "mean": 8.02,
+        "median": 7.0,
+        "stdev": 3.645,
+        "min": 3,
+        "max": 15
+      },
+      "annotation_area_fraction": {
+        "mean": 0.00525,
+        "median": 0.00449,
+        "stdev": 0.00279
+      },
+      "size_class_counts": {
+        "small": 1,
+        "medium": 371,
+        "large": 29
+      }
+    },
+    "EfficientGroundingSAM": {
+      "n_images": 50,
+      "n_images_non_empty": 50,
+      "detection_rate": 1.0,
+      "total_annotations": 401,
+      "annotations_per_image": {
+        "mean": 8.02,
+        "median": 7.0,
+        "stdev": 3.645,
+        "min": 3,
+        "max": 15
+      },
+      "annotation_area_fraction": {
+        "mean": 0.00525,
+        "median": 0.00449,
+        "stdev": 0.00279
+      },
+      "size_class_counts": {
+        "small": 1,
+        "medium": 371,
+        "large": 29
+      }
+    }
+  },
+  "pairwise": {
+    "SAM3_vs_GroundingSAM": {
+      "total_annotations_a": 538,
+      "total_annotations_b": 401,
+      "matched_pairs": 394,
+      "precision_a": 0.7323,
+      "recall_b": 0.9825,
+      "f1": 0.8392,
+      "mean_bbox_iou": 0.8927,
+      "median_bbox_iou": 0.9166,
+      "stdev_bbox_iou": 0.0815,
+      "mean_mask_iou": 0.8513,
+      "median_mask_iou": 0.8716,
+      "stdev_mask_iou": 0.081
+    },
+    "SAM3_vs_EfficientGroundingSAM": {
+      "total_annotations_a": 538,
+      "total_annotations_b": 401,
+      "matched_pairs": 394,
+      "precision_a": 0.7323,
+      "recall_b": 0.9825,
+      "f1": 0.8392,
+      "mean_bbox_iou": 0.8928,
+      "median_bbox_iou": 0.9165,
+      "stdev_bbox_iou": 0.0815,
+      "mean_mask_iou": 0.7812,
+      "median_mask_iou": 0.8193,
+      "stdev_mask_iou": 0.1158
+    },
+    "GroundingSAM_vs_EfficientGroundingSAM": {
+      "total_annotations_a": 401,
+      "total_annotations_b": 401,
+      "matched_pairs": 401,
+      "precision_a": 1.0,
+      "recall_b": 1.0,
+      "f1": 1.0,
+      "mean_bbox_iou": 0.9996,
+      "median_bbox_iou": 0.9997,
+      "stdev_bbox_iou": 0.001,
+      "mean_mask_iou": 0.8103,
+      "median_mask_iou": 0.8458,
+      "stdev_mask_iou": 0.1205
+    }
+  }
+}

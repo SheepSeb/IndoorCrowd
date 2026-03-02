@@ -1,0 +1,35 @@
+% ---- Table 1: Per-model annotation statistics ----
+\begin{table}[ht]
+\centering
+\caption{Annotation statistics for each auto-labelling model on the common image set.}
+\label{tab:annotation_stats}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Metric} & \textbf{SAM3} & \textbf{GroundingSAM} & \textbf{Eff.\ GroundingSAM} \\
+\midrule
+Images (common) & 50 & 50 & 50 \\
+Detection rate & 100.0% & 100.0% & 100.0% \\
+Total annotations & 538 & 401 & 401 \\
+Anns/image (mean$\pm$std) & 10.76$\pm$3.81 & 8.02$\pm$3.65 & 8.02$\pm$3.65 \\
+Anns/image (median) & 9.00 & 7.00 & 7.00 \\
+Area fraction, mean (\%) & 0.44 & 0.53 & 0.53 \\
+Small / Medium / Large & 37/482/19 & 1/371/29 & 1/371/29 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---- Table 2: Pairwise agreement metrics ----
+\begin{table}[ht]
+\centering
+\caption{Pairwise agreement between auto-labelling models. Precision and Recall are computed over matched annotation pairs (greedy bbox-IoU matching). IoU values are means over matched pairs.}
+\label{tab:pairwise}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Pair} & \textbf{Matched} & \textbf{Prec.} & \textbf{Rec.} & \textbf{F1} & \textbf{BBox IoU} & \textbf{Mask IoU} \\
+\midrule
+SAM3 vs GroundingSAM & 394 & 0.732 & 0.983 & 0.839 & 0.893 & 0.851 \\
+SAM3 vs EfficientGroundingSAM & 394 & 0.732 & 0.983 & 0.839 & 0.893 & 0.781 \\
+GroundingSAM vs EfficientGroundingSAM & 401 & 1.000 & 1.000 & 1.000 & 1.000 & 0.810 \\
+\bottomrule
+\end{tabular}
+\end{table}
