@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(uv run:*)",
-      "Bash(.venv/bin/python:*)"
-    ]
-  }
-}
