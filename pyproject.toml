@@ -21,6 +21,8 @@ dependencies = [
     "autodistill-grounding-dino>=0.1.0",
     "scikit-learn>=1.0.0",
     "roboflow>=1.0.0",
+    "motmetrics>=1.4.0",
+    "boxmot>=10.0.0",
 ]
 
 [[tool.uv.index]]

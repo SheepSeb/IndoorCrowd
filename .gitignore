@@ -11,3 +11,8 @@ wheels/
 dataset/
 .env
 *.pt
+out/
+runs/
+*_dataset/
+.gradio/
+results/

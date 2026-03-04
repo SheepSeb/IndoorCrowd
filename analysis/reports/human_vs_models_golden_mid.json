@@ -1,0 +1,426 @@
+{
+  "model_metrics": {
+    "acs_ec": {
+      "SAM3": {
+        "method": "SAM3",
+        "scene_group": "acs_ec",
+        "n_images": 174,
+        "n_gt": 2128,
+        "n_pred": 3596,
+        "ap_by_thresh": {
+          "0.5": 0.7826540383821687,
+          "0.75": 0.5994250528544803
+        },
+        "precision_by_thresh": {
+          "0.5": 0.5216907675194661,
+          "0.75": 0.4146273637374861
+        },
+        "recall_by_thresh": {
+          "0.5": 0.881578947368421,
+          "0.75": 0.7006578947368421
+        },
+        "mean_mask_iou": 0.8023395243792406,
+        "cohen_kappa": 0.8486196598689221
+      },
+      "GroundingSAM": {
+        "method": "GroundingSAM",
+        "scene_group": "acs_ec",
+        "n_images": 174,
+        "n_gt": 2128,
+        "n_pred": 1214,
+        "ap_by_thresh": {
+          "0.5": 0.4350189261113982,
+          "0.75": 0.3242719765162466
+        },
+        "precision_by_thresh": {
+          "0.5": 0.8311367380560132,
+          "0.75": 0.6738056013179572
+        },
+        "recall_by_thresh": {
+          "0.5": 0.4741541353383459,
+          "0.75": 0.3843984962406015
+        },
+        "mean_mask_iou": 0.8311801508649906,
+        "cohen_kappa": 0.7624223774425193
+      },
+      "EfficientGroundingSAM": {
+        "method": "EfficientGroundingSAM",
+        "scene_group": "acs_ec",
+        "n_images": 174,
+        "n_gt": 2128,
+        "n_pred": 1212,
+        "ap_by_thresh": {
+          "0.5": 0.4333293466536134,
+          "0.75": 0.3232565162408515
+        },
+        "precision_by_thresh": {
+          "0.5": 0.8292079207920792,
+          "0.75": 0.6732673267326733
+        },
+        "recall_by_thresh": {
+          "0.5": 0.47227443609022557,
+          "0.75": 0.38345864661654133
+        },
+        "mean_mask_iou": 0.8033904203882538,
+        "cohen_kappa": 0.7580104104578976
+      }
+    },
+    "acs_eg": {
+      "SAM3": {
+        "method": "SAM3",
+        "scene_group": "acs_eg",
+        "n_images": 233,
+        "n_gt": 1260,
+        "n_pred": 1643,
+        "ap_by_thresh": {
+          "0.5": 0.9633063927466351,
+          "0.75": 0.8616090917796619
+        },
+        "precision_by_thresh": {
+          "0.5": 0.7486305538648813,
+          "0.75": 0.6816798539257456
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9761904761904762,
+          "0.75": 0.8888888888888888
+        },
+        "mean_mask_iou": 0.8590612874431952,
+        "cohen_kappa": 0.9258757004755453
+      },
+      "GroundingSAM": {
+        "method": "GroundingSAM",
+        "scene_group": "acs_eg",
+        "n_images": 233,
+        "n_gt": 1260,
+        "n_pred": 1359,
+        "ap_by_thresh": {
+          "0.5": 0.922170272924271,
+          "0.75": 0.8237085378558586
+        },
+        "precision_by_thresh": {
+          "0.5": 0.8704930095658573,
+          "0.75": 0.7969094922737306
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9388888888888889,
+          "0.75": 0.8595238095238096
+        },
+        "mean_mask_iou": 0.8685942618342414,
+        "cohen_kappa": 0.9313156529648136
+      },
+      "EfficientGroundingSAM": {
+        "method": "EfficientGroundingSAM",
+        "scene_group": "acs_eg",
+        "n_images": 233,
+        "n_gt": 1260,
+        "n_pred": 1360,
+        "ap_by_thresh": {
+          "0.5": 0.9243264272907069,
+          "0.75": 0.825574986244861
+        },
+        "precision_by_thresh": {
+          "0.5": 0.8720588235294118,
+          "0.75": 0.7985294117647059
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9412698412698413,
+          "0.75": 0.861904761904762
+        },
+        "mean_mask_iou": 0.8495085715346109,
+        "cohen_kappa": 0.9336842300742174
+      }
+    },
+    "ie_central": {
+      "SAM3": {
+        "method": "SAM3",
+        "scene_group": "ie_central",
+        "n_images": 136,
+        "n_gt": 1083,
+        "n_pred": 1235,
+        "ap_by_thresh": {
+          "0.5": 0.9278380580346439,
+          "0.75": 0.7875555843138184
+        },
+        "precision_by_thresh": {
+          "0.5": 0.8291497975708502,
+          "0.75": 0.7336032388663968
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9455216989843028,
+          "0.75": 0.8365650969529086
+        },
+        "mean_mask_iou": 0.8357805559224947,
+        "cohen_kappa": 0.9228314848321194
+      },
+      "GroundingSAM": {
+        "method": "GroundingSAM",
+        "scene_group": "ie_central",
+        "n_images": 136,
+        "n_gt": 1083,
+        "n_pred": 953,
+        "ap_by_thresh": {
+          "0.5": 0.8032804528297655,
+          "0.75": 0.6703928794387864
+        },
+        "precision_by_thresh": {
+          "0.5": 0.9286463798530955,
+          "0.75": 0.8121720881427072
+        },
+        "recall_by_thresh": {
+          "0.5": 0.817174515235457,
+          "0.75": 0.7146814404432132
+        },
+        "mean_mask_iou": 0.835473936319616,
+        "cohen_kappa": 0.9015158950965138
+      },
+      "EfficientGroundingSAM": {
+        "method": "EfficientGroundingSAM",
+        "scene_group": "ie_central",
+        "n_images": 136,
+        "n_gt": 1083,
+        "n_pred": 954,
+        "ap_by_thresh": {
+          "0.5": 0.8041825339656999,
+          "0.75": 0.6723078100923933
+        },
+        "precision_by_thresh": {
+          "0.5": 0.9287211740041929,
+          "0.75": 0.8134171907756813
+        },
+        "recall_by_thresh": {
+          "0.5": 0.8180978762696214,
+          "0.75": 0.716528162511542
+        },
+        "mean_mask_iou": 0.8091212620040881,
+        "cohen_kappa": 0.9042244558845405
+      }
+    },
+    "r_central": {
+      "SAM3": {
+        "method": "SAM3",
+        "scene_group": "r_central",
+        "n_images": 57,
+        "n_gt": 391,
+        "n_pred": 589,
+        "ap_by_thresh": {
+          "0.5": 0.9462462219513095,
+          "0.75": 0.8322439788498025
+        },
+        "precision_by_thresh": {
+          "0.5": 0.6519524617996605,
+          "0.75": 0.5738539898132428
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9820971867007673,
+          "0.75": 0.8644501278772379
+        },
+        "mean_mask_iou": 0.8467952223518673,
+        "cohen_kappa": 0.8636083558074522
+      },
+      "GroundingSAM": {
+        "method": "GroundingSAM",
+        "scene_group": "r_central",
+        "n_images": 57,
+        "n_gt": 391,
+        "n_pred": 551,
+        "ap_by_thresh": {
+          "0.5": 0.901407889540349,
+          "0.75": 0.7739681808073207
+        },
+        "precision_by_thresh": {
+          "0.5": 0.6696914700544465,
+          "0.75": 0.5807622504537205
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9437340153452686,
+          "0.75": 0.8184143222506394
+        },
+        "mean_mask_iou": 0.8531239162959419,
+        "cohen_kappa": 0.8594277809574746
+      },
+      "EfficientGroundingSAM": {
+        "method": "EfficientGroundingSAM",
+        "scene_group": "r_central",
+        "n_images": 57,
+        "n_gt": 391,
+        "n_pred": 550,
+        "ap_by_thresh": {
+          "0.5": 0.8997871677992524,
+          "0.75": 0.7741311854027464
+        },
+        "precision_by_thresh": {
+          "0.5": 0.6690909090909091,
+          "0.75": 0.5818181818181818
+        },
+        "recall_by_thresh": {
+          "0.5": 0.9411764705882353,
+          "0.75": 0.8184143222506394
+        },
+        "mean_mask_iou": 0.8296347480776085,
+        "cohen_kappa": 0.8490671725543483
+      }
+    }
+  },
+  "scene_stats": {
+    "acs_ec": {
+      "scene_group": "acs_ec",
+      "n_images": 174,
+      "person_count_mean": 12.229885057471265,
+      "person_count_std": 3.797477560810878,
+      "person_count_min": 3,
+      "person_count_max": 20,
+      "density_counts": {
+        "empty": 0,
+        "sparse": 5,
+        "medium": 31,
+        "dense": 138
+      },
+      "density_fractions": {
+        "empty": 0.0,
+        "sparse": 0.028735632183908046,
+        "medium": 0.1781609195402299,
+        "dense": 0.7931034482758621
+      },
+      "rel_scale_mean": 0.06328510612654561,
+      "rel_scale_std": 0.03927590580439078,
+      "abs_scale_mean": 60.75370188148379,
+      "abs_scale_std": 37.70486957221515,
+      "size_bin_counts": {
+        "small": 366,
+        "medium": 1563,
+        "large": 199
+      },
+      "size_bin_fractions": {
+        "small": 0.17199248120300753,
+        "medium": 0.7344924812030075,
+        "large": 0.09351503759398497
+      },
+      "aspect_ratio_mean": 2.0170939010970623,
+      "aspect_ratio_std": 0.8889659467942653,
+      "occluded_instances": 586,
+      "total_instances": 2128,
+      "occlusion_fraction": 0.27537593984962405,
+      "heatmap_path": "analysis/figures/human_scene_stats/density_heatmap_acs_ec.png"
+    },
+    "acs_eg": {
+      "scene_group": "acs_eg",
+      "n_images": 233,
+      "person_count_mean": 5.407725321888412,
+      "person_count_std": 1.9367877939282574,
+      "person_count_min": 2,
+      "person_count_max": 10,
+      "density_counts": {
+        "empty": 0,
+        "sparse": 43,
+        "medium": 190,
+        "dense": 0
+      },
+      "density_fractions": {
+        "empty": 0.0,
+        "sparse": 0.18454935622317598,
+        "medium": 0.8154506437768241,
+        "dense": 0.0
+      },
+      "rel_scale_mean": 0.14126022037285135,
+      "rel_scale_std": 0.08141755417112558,
+      "abs_scale_mean": 135.6098115579373,
+      "abs_scale_std": 78.16085200428056,
+      "size_bin_counts": {
+        "small": 13,
+        "medium": 511,
+        "large": 736
+      },
+      "size_bin_fractions": {
+        "small": 0.010317460317460317,
+        "medium": 0.40555555555555556,
+        "large": 0.5841269841269842
+      },
+      "aspect_ratio_mean": 3.2757453637927174,
+      "aspect_ratio_std": 1.033576968771429,
+      "occluded_instances": 482,
+      "total_instances": 1260,
+      "occlusion_fraction": 0.3825396825396825,
+      "heatmap_path": "analysis/figures/human_scene_stats/density_heatmap_acs_eg.png"
+    },
+    "ie_central": {
+      "scene_group": "ie_central",
+      "n_images": 136,
+      "person_count_mean": 7.963235294117647,
+      "person_count_std": 3.625849761417967,
+      "person_count_min": 4,
+      "person_count_max": 17,
+      "density_counts": {
+        "empty": 0,
+        "sparse": 0,
+        "medium": 104,
+        "dense": 32
+      },
+      "density_fractions": {
+        "empty": 0.0,
+        "sparse": 0.0,
+        "medium": 0.7647058823529411,
+        "dense": 0.23529411764705882
+      },
+      "rel_scale_mean": 0.09497187495646853,
+      "rel_scale_std": 0.04016230998171383,
+      "abs_scale_mean": 91.17299995820979,
+      "abs_scale_std": 38.55581758244528,
+      "size_bin_counts": {
+        "small": 36,
+        "medium": 539,
+        "large": 508
+      },
+      "size_bin_fractions": {
+        "small": 0.0332409972299169,
+        "medium": 0.4976915974145891,
+        "large": 0.469067405355494
+      },
+      "aspect_ratio_mean": 2.4752016444163893,
+      "aspect_ratio_std": 0.6640918322419663,
+      "occluded_instances": 345,
+      "total_instances": 1083,
+      "occlusion_fraction": 0.3185595567867036,
+      "heatmap_path": "analysis/figures/human_scene_stats/density_heatmap_ie_central.png"
+    },
+    "r_central": {
+      "scene_group": "r_central",
+      "n_images": 57,
+      "person_count_mean": 6.859649122807017,
+      "person_count_std": 1.5170294809644564,
+      "person_count_min": 3,
+      "person_count_max": 8,
+      "density_counts": {
+        "empty": 0,
+        "sparse": 1,
+        "medium": 56,
+        "dense": 0
+      },
+      "density_fractions": {
+        "empty": 0.0,
+        "sparse": 0.017543859649122806,
+        "medium": 0.9824561403508771,
+        "dense": 0.0
+      },
+      "rel_scale_mean": 0.06152515953572364,
+      "rel_scale_std": 0.01709091228171857,
+      "abs_scale_mean": 59.0641531542947,
+      "abs_scale_std": 16.407275790449823,
+      "size_bin_counts": {
+        "small": 19,
+        "medium": 366,
+        "large": 6
+      },
+      "size_bin_fractions": {
+        "small": 0.04859335038363171,
+        "medium": 0.9360613810741688,
+        "large": 0.015345268542199489
+      },
+      "aspect_ratio_mean": 2.25610640315699,
+      "aspect_ratio_std": 0.7348126685990651,
+      "occluded_instances": 105,
+      "total_instances": 391,
+      "occlusion_fraction": 0.26854219948849106,
+      "heatmap_path": "analysis/figures/human_scene_stats/density_heatmap_r_central.png"
+    }
+  }
+}

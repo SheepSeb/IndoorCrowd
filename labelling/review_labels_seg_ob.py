@@ -77,7 +77,9 @@ def xyxy_to_xywh(box_xyxy: list[float]) -> list[float]:
 
 def collect_images(images_dir: Path) -> list[Path]:
     images = [
-        p for p in sorted(images_dir.rglob("*")) if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+        p
+        for p in sorted(images_dir.rglob("*"))
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
     ]
     return images
 
@@ -176,7 +178,9 @@ class Session:
         rel = self.current_rel_file()
         if rel is None:
             return [], []
-        return self.pos_points_by_file.get(rel, []), self.neg_points_by_file.get(rel, [])
+        return self.pos_points_by_file.get(rel, []), self.neg_points_by_file.get(
+            rel, []
+        )
 
     def add_point_current(self, x: int, y: int, positive: bool):
         rel = self.current_rel_file()
@@ -231,25 +235,31 @@ class Session:
         anns: list[dict] = []
         if res.masks is None or res.boxes is None:
             return anns
-        for mask_t, box_t, score_t in zip(res.masks.data, res.boxes.xyxy, res.boxes.conf):
+        for mask_t, box_t, score_t in zip(
+            res.masks.data, res.boxes.xyxy, res.boxes.conf
+        ):
             mask = mask_t.cpu().numpy().astype(np.uint8)
             if mask.shape != (h, w):
                 mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
             box = xyxy_to_xywh(box_t.cpu().tolist())
-            anns.append({
-                "id": self.next_ann_id,
-                "image_id": -1,
-                "category_id": 1,
-                "bbox": [round(float(v), 2) for v in box],
-                "area": round(float(mask.sum()), 2),
-                "segmentation": encode_rle(mask),
-                "score": round(float(score_t), 4),
-                "iscrowd": 0,
-            })
+            anns.append(
+                {
+                    "id": self.next_ann_id,
+                    "image_id": -1,
+                    "category_id": 1,
+                    "bbox": [round(float(v), 2) for v in box],
+                    "area": round(float(mask.sum()), 2),
+                    "segmentation": encode_rle(mask),
+                    "score": round(float(score_t), 4),
+                    "iscrowd": 0,
+                }
+            )
             self.next_ann_id += 1
         return anns
 
-    def run_autodetect(self, conf: float, iou: float, imgsz: int, overwrite: bool) -> str:
+    def run_autodetect(
+        self, conf: float, iou: float, imgsz: int, overwrite: bool
+    ) -> str:
         """Run YOLO on every image. Returns a summary string."""
         if not self.images or self.images_dir is None:
             return "Load a folder first."
@@ -266,7 +276,9 @@ class Session:
         self.total_detected += n_detected
         msg = f"Auto-detected {n_detected} persons across {len(self.images) - n_skipped} images."
         if n_skipped:
-            msg += f" Skipped {n_skipped} already-labelled (uncheck Overwrite to re-run)."
+            msg += (
+                f" Skipped {n_skipped} already-labelled (uncheck Overwrite to re-run)."
+            )
         return msg
 
     def detect_current(self, conf: float, iou: float, imgsz: int) -> str:
@@ -351,7 +363,9 @@ class Session:
             arr = np.array(Image.open(p).convert("RGB"))
             h, w = arr.shape[:2]
             img_id_by_rel[rel] = i
-            images.append({"id": i, "file_name": rel, "width": int(w), "height": int(h)})
+            images.append(
+                {"id": i, "file_name": rel, "width": int(w), "height": int(h)}
+            )
         for rel, anns in self.anns_by_file.items():
             if rel not in img_id_by_rel:
                 continue
@@ -387,7 +401,11 @@ def render(img: np.ndarray, anns: list[dict]) -> np.ndarray:
     return vis
 
 
-def draw_points(vis: np.ndarray, pos_points: list[tuple[int, int]], neg_points: list[tuple[int, int]]) -> np.ndarray:
+def draw_points(
+    vis: np.ndarray,
+    pos_points: list[tuple[int, int]],
+    neg_points: list[tuple[int, int]],
+) -> np.ndarray:
     out = vis.copy()
     for x, y in pos_points:
         cv2.circle(out, (x, y), 6, (60, 220, 80), -1)
@@ -400,7 +418,9 @@ def draw_points(vis: np.ndarray, pos_points: list[tuple[int, int]], neg_points: 
     return out
 
 
-def draw_polygon_preview(vis: np.ndarray, poly_points: list[tuple[int, int]]) -> np.ndarray:
+def draw_polygon_preview(
+    vis: np.ndarray, poly_points: list[tuple[int, int]]
+) -> np.ndarray:
     out = vis.copy()
     if not poly_points:
         return out
@@ -409,7 +429,15 @@ def draw_polygon_preview(vis: np.ndarray, poly_points: list[tuple[int, int]]) ->
     for i, (x, y) in enumerate(poly_points):
         cv2.circle(out, (x, y), 5, (80, 180, 255), -1)
         cv2.circle(out, (x, y), 8, (255, 255, 255), 2)
-        cv2.putText(out, str(i + 1), (x + 8, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+        cv2.putText(
+            out,
+            str(i + 1),
+            (x + 8, y - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (255, 255, 255),
+            1,
+        )
     return out
 
 
@@ -418,15 +446,27 @@ def build_app(session: Session):
         gr.Markdown("# FastSAM Segmentation Assistant")
 
         with gr.Row():
-            images_dir_tb = gr.Textbox(label="Images folder", placeholder="/path/to/images")
-            out_json_tb = gr.Textbox(label="Output COCO JSON", placeholder="/path/to/output.json")
+            images_dir_tb = gr.Textbox(
+                label="Images folder", placeholder="/path/to/images"
+            )
+            out_json_tb = gr.Textbox(
+                label="Output COCO JSON", placeholder="/path/to/output.json"
+            )
             load_btn = gr.Button("Load Folder", variant="primary")
 
         with gr.Row():
-            yolo_conf = gr.Slider(0.0, 1.0, value=0.35, step=0.01, label="YOLO conf", scale=2)
-            yolo_iou = gr.Slider(0.0, 1.0, value=0.45, step=0.01, label="YOLO IoU NMS", scale=2)
-            yolo_imgsz = gr.Slider(320, 1280, value=640, step=32, label="YOLO image size", scale=2)
-            yolo_overwrite = gr.Checkbox(label="Overwrite existing", value=False, scale=1)
+            yolo_conf = gr.Slider(
+                0.0, 1.0, value=0.35, step=0.01, label="YOLO conf", scale=2
+            )
+            yolo_iou = gr.Slider(
+                0.0, 1.0, value=0.45, step=0.01, label="YOLO IoU NMS", scale=2
+            )
+            yolo_imgsz = gr.Slider(
+                320, 1280, value=640, step=32, label="YOLO image size", scale=2
+            )
+            yolo_overwrite = gr.Checkbox(
+                label="Overwrite existing", value=False, scale=1
+            )
             autodetect_btn = gr.Button("Auto-detect all", variant="primary", scale=1)
             detect_current_btn = gr.Button("Re-detect current", scale=1)
 
@@ -446,7 +486,12 @@ def build_app(session: Session):
                 stats_md = gr.Markdown("")
                 gr.Markdown("---")
                 click_action = gr.Radio(
-                    choices=["Add positive point", "Add negative point", "Add polygon vertex", "Remove"],
+                    choices=[
+                        "Add positive point",
+                        "Add negative point",
+                        "Add polygon vertex",
+                        "Remove",
+                    ],
                     value="Add positive point",
                     label="Click action",
                 )
@@ -454,7 +499,9 @@ def build_app(session: Session):
                 clear_points_btn = gr.Button("Clear points")
                 finalize_polygon_btn = gr.Button("Finalize polygon", variant="primary")
                 clear_polygon_btn = gr.Button("Clear polygon")
-                remove_all = gr.Checkbox(label="Remove all overlapping at click", value=False)
+                remove_all = gr.Checkbox(
+                    label="Remove all overlapping at click", value=False
+                )
                 gr.Markdown("---")
                 seg_backend = gr.Radio(
                     choices=["SAM2 (recommended)", "FastSAM"],
@@ -469,7 +516,9 @@ def build_app(session: Session):
                 gr.Markdown("*FastSAM-only settings*")
                 conf = gr.Slider(0.0, 1.0, value=0.25, step=0.01, label="FastSAM conf")
                 iou = gr.Slider(0.0, 1.0, value=0.9, step=0.01, label="FastSAM IoU")
-                imgsz = gr.Slider(256, 1536, value=1024, step=32, label="FastSAM image size")
+                imgsz = gr.Slider(
+                    256, 1536, value=1024, step=32, label="FastSAM image size"
+                )
 
         def refresh():
             img = session.current_image()
@@ -497,15 +546,27 @@ def build_app(session: Session):
             p = Path(images_dir)
             if not p.exists() or not p.is_dir():
                 gr.Warning(f"Images folder not found: {p}")
-                return gr.update(), gr.update(), "Invalid images folder.", session.stats_text
+                return (
+                    gr.update(),
+                    gr.update(),
+                    "Invalid images folder.",
+                    session.stats_text,
+                )
             session.load(p, Path(out_json))
             vis, status, stats = refresh()
-            return gr.update(maximum=max(len(session.images) - 1, 0), value=0), vis, status, stats
+            return (
+                gr.update(maximum=max(len(session.images) - 1, 0), value=0),
+                vis,
+                status,
+                stats,
+            )
 
         def on_autodetect(conf_v: float, iou_v: float, imgsz_v: float, overwrite: bool):
             if not session.images:
                 return "Load a folder first.", *refresh()
-            msg = session.run_autodetect(conf=conf_v, iou=iou_v, imgsz=int(imgsz_v), overwrite=overwrite)
+            msg = session.run_autodetect(
+                conf=conf_v, iou=iou_v, imgsz=int(imgsz_v), overwrite=overwrite
+            )
             gr.Info(msg)
             return msg, *refresh()
 
@@ -560,7 +621,9 @@ def build_app(session: Session):
                 session.add_point_current(x=x, y=y, positive=False)
                 return refresh()
             session.add_point_current(x=x, y=y, positive=True)
-            return on_apply_prompt(backend=backend, conf_v=conf_v, iou_v=iou_v, imgsz_v=imgsz_v)
+            return on_apply_prompt(
+                backend=backend, conf_v=conf_v, iou_v=iou_v, imgsz_v=imgsz_v
+            )
 
         def on_apply_prompt(backend: str, conf_v: float, iou_v: float, imgsz_v: float):
             img = session.current_image()
@@ -573,7 +636,9 @@ def build_app(session: Session):
             h, w = img.shape[:2]
 
             if backend == "SAM2 (recommended)":
-                all_points = [[float(px), float(py)] for px, py in pos_points + neg_points]
+                all_points = [
+                    [float(px), float(py)] for px, py in pos_points + neg_points
+                ]
                 all_labels = [1] * len(pos_points) + [0] * len(neg_points)
                 results = session.sam2().predict(
                     img, points=[all_points], labels=[all_labels], verbose=False
@@ -585,7 +650,9 @@ def build_app(session: Session):
 
                 best = None
                 best_score = -1.0
-                for mask_t, box_t, score_t in zip(res.masks.data, res.boxes.xyxy, res.boxes.conf):
+                for mask_t, box_t, score_t in zip(
+                    res.masks.data, res.boxes.xyxy, res.boxes.conf
+                ):
                     m = mask_t.cpu().numpy().astype(np.uint8)
                     if m.shape != (h, w):
                         m = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -602,7 +669,9 @@ def build_app(session: Session):
                     return refresh()
 
                 mask, box_xyxy, score = best
-                session.add_ann(mask=mask, bbox_xywh=xyxy_to_xywh(box_xyxy), score=score)
+                session.add_ann(
+                    mask=mask, bbox_xywh=xyxy_to_xywh(box_xyxy), score=score
+                )
                 session.clear_points_current()
                 gr.Info(f"Added annotation via SAM2 (score {score:.3f})")
                 return refresh()
@@ -672,9 +741,13 @@ def build_app(session: Session):
             x1, x2 = int(xs.min()), int(xs.max())
             y1, y2 = int(ys.min()), int(ys.max())
             bbox_xywh = [float(x1), float(y1), float(x2 - x1 + 1), float(y2 - y1 + 1)]
-            segmentation = [[coord for x, y in poly_points for coord in (float(x), float(y))]]
+            segmentation = [
+                [coord for x, y in poly_points for coord in (float(x), float(y))]
+            ]
 
-            session.add_ann(mask=mask, bbox_xywh=bbox_xywh, score=1.0, segmentation=segmentation)
+            session.add_ann(
+                mask=mask, bbox_xywh=bbox_xywh, score=1.0, segmentation=segmentation
+            )
             session.clear_polygon_points_current()
             gr.Info("Added polygon annotation.")
             return refresh()
@@ -689,16 +762,24 @@ def build_app(session: Session):
             _, status, stats = refresh()
             return status, stats
 
-        load_btn.click(on_load, [images_dir_tb, out_json_tb], [frame_slider, image_out, status_md, stats_md])
+        load_btn.click(
+            on_load,
+            [images_dir_tb, out_json_tb],
+            [frame_slider, image_out, status_md, stats_md],
+        )
         autodetect_btn.click(
-            on_autodetect, [yolo_conf, yolo_iou, yolo_imgsz, yolo_overwrite],
+            on_autodetect,
+            [yolo_conf, yolo_iou, yolo_imgsz, yolo_overwrite],
             [detect_status, image_out, status_md, stats_md],
         )
         detect_current_btn.click(
-            on_detect_current, [yolo_conf, yolo_iou, yolo_imgsz],
+            on_detect_current,
+            [yolo_conf, yolo_iou, yolo_imgsz],
             [detect_status, image_out, status_md, stats_md],
         )
-        frame_slider.release(on_slider, [frame_slider], [image_out, status_md, stats_md])
+        frame_slider.release(
+            on_slider, [frame_slider], [image_out, status_md, stats_md]
+        )
         prev_btn.click(on_prev, [], [frame_slider, image_out, status_md, stats_md])
         next_btn.click(on_next, [], [frame_slider, image_out, status_md, stats_md])
         image_out.select(
@@ -712,7 +793,9 @@ def build_app(session: Session):
             [image_out, status_md, stats_md],
         )
         clear_points_btn.click(on_clear_points, [], [image_out, status_md, stats_md])
-        finalize_polygon_btn.click(on_finalize_polygon, [], [image_out, status_md, stats_md])
+        finalize_polygon_btn.click(
+            on_finalize_polygon, [], [image_out, status_md, stats_md]
+        )
         clear_polygon_btn.click(on_clear_polygon, [], [image_out, status_md, stats_md])
         save_btn.click(on_save, [], [status_md, stats_md])
 
@@ -721,7 +804,12 @@ def build_app(session: Session):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="FastSAM segmentation assistant.")
-    parser.add_argument("--images-dir", type=Path, default=None, help="Optional image folder to pre-load.")
+    parser.add_argument(
+        "--images-dir",
+        type=Path,
+        default=None,
+        help="Optional image folder to pre-load.",
+    )
     parser.add_argument(
         "--output-json",
         type=Path,
@@ -762,7 +850,7 @@ def main() -> None:
 
     app.launch(
         server_port=args.port,
-        share=args.share,
+        share=True,
         theme=gr.themes.Soft(),
         css="#component-0 {cursor: crosshair;}",
     )
