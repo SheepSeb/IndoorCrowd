@@ -1,300 +1,328 @@
-"""Auto-label frames using SAM3 (Segment Anything Model 3) with text-prompted
-segmentation, producing COCO-format annotations with bounding boxes and
-instance segmentation masks.
+#!/usr/bin/env python3
+"""SAM3 video tracking → scene-level MOT gt.txt for raw_frames_5fps.
 
-Processes each scene (recording folder) independently, showing per-scene
-progress and saving annotations immediately after each scene finishes.
+Uses SAM3VideoSemanticPredictor (SAM3's built-in tracker) to detect and track
+persons.  Because the predictor requires video input and resets its state between
+clips, each scene is split into overlapping parts.  Track IDs are offset per part
+so they never collide in the merged output.
 
-Output layout:
-    dataset/labels/{split}/{scene_name}.json
+Output layout
+-------------
+  dataset/MOT_labels_sam3_5fps/
+    {split}/
+      {scene}/
+        gt/gt.txt        ← frame,id,x,y,w,h,conf,-1,-1,-1  (global 1-based frames)
+        seqinfo.ini
+
+Usage
+-----
+  # All splits / scenes
+  uv run python labelling/autolabel_sam3_5fps.py
+
+  # One split / scene
+  uv run python labelling/autolabel_sam3_5fps.py \\
+      --splits train \\
+      --scenes acs_s1_recording_2026-02-23_17-15-46 \\
+      --overwrite
+
+  # Tune
+  uv run python labelling/autolabel_sam3_5fps.py \\
+      --part-size  60   \\
+      --conf       0.25 \\
+      --min-track-len 3
 """
 
+from __future__ import annotations
+
 import argparse
-import json
-import os
-import time
+import configparser
+import fnmatch
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
-import torch
-from dotenv import load_dotenv
-from PIL import Image
-from pycocotools import mask as mask_utils
 from tqdm import tqdm
-from transformers import Sam3Model, Sam3Processor
 
-load_dotenv()
-
-
-def mask_to_rle(binary_mask: np.ndarray) -> dict:
-    """Convert a binary mask to COCO RLE format via pycocotools."""
-    rle = mask_utils.encode(np.asfortranarray(binary_mask.astype(np.uint8)))
-    rle["counts"] = rle["counts"].decode("utf-8")
-    return rle
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+FRAME_RATE = 5
 
 
-def mask_to_polygons(binary_mask: np.ndarray) -> list[list[float]]:
-    """Convert a binary mask to COCO polygon format via OpenCV contours."""
-    contours, _ = cv2.findContours(
-        binary_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def collect_frames(scene_dir: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in scene_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
     )
-    polygons = []
-    for contour in contours:
-        if contour.shape[0] < 3:
-            continue
-        polygons.append(contour.flatten().tolist())
-    return polygons
 
 
-def xyxy_to_xywh(box: list[float]) -> list[float]:
-    """Convert [x1, y1, x2, y2] to COCO [x, y, w, h]."""
-    x1, y1, x2, y2 = box
-    return [x1, y1, x2 - x1, y2 - y1]
+def frame_number(p: Path) -> int:
+    digits = "".join(c for c in p.stem if c.isdigit())
+    return int(digits) if digits else 0
 
 
-def discover_scenes(raw_frames_dir: Path, split: str) -> list[Path]:
-    """Return sorted list of scene directories inside a split folder."""
-    split_dir = raw_frames_dir / split
-    if not split_dir.exists():
-        return []
-    return sorted(p for p in split_dir.iterdir() if p.is_dir())
+def write_video(frames: list[Path], out_path: Path, fps: int) -> tuple[int, int]:
+    first = cv2.imread(str(frames[0]))
+    h, w = first.shape[:2]
+    writer = cv2.VideoWriter(
+        str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h)
+    )
+    for f in frames:
+        img = cv2.imread(str(f))
+        if img is not None:
+            writer.write(img)
+    writer.release()
+    return w, h
 
 
-def process_scene(
-    model: Sam3Model,
-    processor: Sam3Processor,
+# ── scene processing ──────────────────────────────────────────────────────────
+
+
+def run_scene(
     scene_dir: Path,
-    raw_frames_dir: Path,
-    text_prompt: str,
-    batch_size: int,
-    threshold: float,
-    mask_threshold: float,
-    seg_format: str,
-    device: str,
+    output_dir: Path,
+    predictor,
+    args,
 ) -> dict:
-    """Process all frames in a single scene and return a COCO dict."""
-    image_paths = sorted(scene_dir.glob("*.jpg"))
-    if not image_paths:
-        return None
+    frames = collect_frames(scene_dir)
+    if not frames:
+        return {"scene": scene_dir.name, "frames": 0, "tracks": 0, "rows": 0}
 
-    coco: dict = {
-        "images": [],
-        "annotations": [],
-        "categories": [{"id": 1, "name": "person", "supercategory": "person"}],
-    }
-    ann_id = 1
+    first_img = cv2.imread(str(frames[0]))
+    img_h, img_w = first_img.shape[:2]
 
-    for batch_start in tqdm(
-        range(0, len(image_paths), batch_size),
-        desc=f"  {scene_dir.name}",
-        unit="batch",
-        leave=False,
-    ):
-        batch_paths = image_paths[batch_start : batch_start + batch_size]
-        pil_images = [Image.open(p).convert("RGB") for p in batch_paths]
-        text_prompts = [text_prompt] * len(pil_images)
+    parts = [
+        frames[i : i + args.part_size] for i in range(0, len(frames), args.part_size)
+    ]
 
-        inputs = processor(
-            images=pil_images, text=text_prompts, return_tensors="pt"
-        ).to(device)
+    # Accumulated MOT rows across all parts: {global_frame: [(tid, x,y,w,h, conf), ...]}
+    mot_rows: list[str] = []
 
-        with torch.no_grad():
-            outputs = model(**inputs)
+    # Track ID offset so each part's IDs don't collide with previous parts
+    tid_offset = 0
 
-        results = processor.post_process_instance_segmentation(
-            outputs,
-            threshold=threshold,
-            mask_threshold=mask_threshold,
-            target_sizes=inputs.get("original_sizes").tolist(),
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tmp_video = output_dir / "_tmp_part.mp4"
+
+    for part_idx, part_frames in enumerate(parts, start=1):
+        tqdm.write(
+            f"    part {part_idx}/{len(parts)}"
+            f"  [{part_frames[0].name}…{part_frames[-1].name}]"
+            f"  ({len(part_frames)} frames)"
         )
 
-        for idx, (img_path, pil_img, result) in enumerate(
-            zip(batch_paths, pil_images, results)
+        write_video(part_frames, tmp_video, fps=FRAME_RATE)
+
+        # Reset SAM3 state so IDs don't leak from prior parts
+        predictor.inference_state = {}
+
+        results_gen = predictor(
+            source=str(tmp_video), text=[args.text_prompt], stream=True
+        )
+
+        part_track_ids: set[int] = set()
+
+        for local_fnum, (frame_path, result) in enumerate(
+            zip(part_frames, results_gen), start=1
         ):
-            image_id = batch_start + idx + 1
-            w, h = pil_img.size
-            rel_path = img_path.relative_to(raw_frames_dir)
+            global_fnum = frame_number(frame_path)
 
-            coco["images"].append(
-                {
-                    "id": image_id,
-                    "file_name": str(rel_path),
-                    "width": w,
-                    "height": h,
-                }
-            )
-
-            masks = result.get("masks", [])
-            boxes = result.get("boxes", [])
-            scores = result.get("scores", [])
-
-            for mask_t, box_t, score_t in zip(masks, boxes, scores):
-                mask_np = mask_t.cpu().numpy().astype(np.uint8)
-                bbox = xyxy_to_xywh(box_t.cpu().tolist())
-                area = float(mask_np.sum())
-
-                if seg_format == "rle":
-                    segmentation = mask_to_rle(mask_np)
-                else:
-                    segmentation = mask_to_polygons(mask_np)
-                    if not segmentation:
-                        continue
-
-                coco["annotations"].append(
-                    {
-                        "id": ann_id,
-                        "image_id": image_id,
-                        "category_id": 1,
-                        "bbox": [round(v, 2) for v in bbox],
-                        "area": round(area, 2),
-                        "segmentation": segmentation,
-                        "score": round(float(score_t), 4),
-                        "iscrowd": 0,
-                    }
-                )
-                ann_id += 1
-
-    return coco
-
-
-def process_split(
-    model: Sam3Model,
-    processor: Sam3Processor,
-    raw_frames_dir: Path,
-    output_dir: Path,
-    split: str,
-    text_prompt: str,
-    batch_size: int,
-    threshold: float,
-    mask_threshold: float,
-    seg_format: str,
-    device: str,
-) -> None:
-    scenes = discover_scenes(raw_frames_dir, split)
-    if not scenes:
-        print(f"No scenes found for split '{split}', skipping.")
-        return
-
-    split_output = output_dir / split
-    split_output.mkdir(parents=True, exist_ok=True)
-
-    total_images = 0
-    total_anns = 0
-
-    print(f"\n{'=' * 60}")
-    print(f"Split '{split}': {len(scenes)} scene(s)")
-    print(f"{'=' * 60}")
-
-    for i, scene_dir in enumerate(scenes, 1):
-        out_path = split_output / f"{scene_dir.name}.json"
-        n_frames = len(list(scene_dir.glob("*.jpg")))
-
-        if out_path.exists():
-            with open(out_path) as f:
-                existing = json.load(f)
-            n_existing = len(existing.get("images", []))
-            if n_existing == n_frames and n_frames > 0:
-                n_ann = len(existing.get("annotations", []))
-                print(f"[{i}/{len(scenes)}] {scene_dir.name}: "
-                      f"already done ({n_existing} imgs, {n_ann} anns) — skipping")
-                total_images += n_existing
-                total_anns += n_ann
+            if result.boxes is None or len(result.boxes) == 0:
                 continue
 
-        print(f"[{i}/{len(scenes)}] {scene_dir.name}: {n_frames} frames")
+            boxes_xyxy = result.boxes.xyxy.cpu().numpy()
+            scores = result.boxes.conf.cpu().numpy()
+            track_ids = (
+                result.boxes.id.cpu().numpy().astype(int)
+                if result.boxes.id is not None
+                else np.arange(len(boxes_xyxy), dtype=int)
+            )
 
-        coco = process_scene(
-            model=model,
-            processor=processor,
-            scene_dir=scene_dir,
-            raw_frames_dir=raw_frames_dir,
-            text_prompt=text_prompt,
-            batch_size=batch_size,
-            threshold=threshold,
-            mask_threshold=mask_threshold,
-            seg_format=seg_format,
-            device=device,
-        )
+            for box, score, tid in zip(boxes_xyxy, scores, track_ids):
+                x1, y1, x2, y2 = box.tolist()
+                x, y, w, h = x1, y1, x2 - x1, y2 - y1
+                global_tid = int(tid) + tid_offset
+                part_track_ids.add(int(tid))
+                mot_rows.append(
+                    f"{global_fnum},{global_tid},{x:.2f},{y:.2f},{w:.2f},{h:.2f}"
+                    f",{score:.4f},-1,-1,-1"
+                )
 
-        if coco is None:
-            print("  -> no images, skipped")
-            continue
+        max_tid = max(part_track_ids, default=-1)
+        tid_offset += max_tid + 1
 
-        with open(out_path, "w") as f:
-            json.dump(coco, f, indent=2)
+    tmp_video.unlink(missing_ok=True)
 
-        n_img = len(coco["images"])
-        n_ann = len(coco["annotations"])
-        total_images += n_img
-        total_anns += n_ann
-        print(f"  -> {n_img} images, {n_ann} annotations => {out_path}")
+    # Optional: drop tracks shorter than min_track_len
+    if args.min_track_len > 1:
+        from collections import defaultdict
 
-    print(f"\nSplit '{split}' done: {total_images} images, {total_anns} annotations total")
+        by_track: dict[int, list[str]] = defaultdict(list)
+        for row in mot_rows:
+            tid = int(row.split(",")[1])
+            by_track[tid].append(row)
+        mot_rows = [
+            row
+            for tid, rows in by_track.items()
+            if len(rows) >= args.min_track_len
+            for row in rows
+        ]
+        # Compact IDs
+        surviving = sorted({int(r.split(",")[1]) for r in mot_rows})
+        remap = {old: new for new, old in enumerate(surviving, start=1)}
+        mot_rows = [
+            ",".join(
+                [r.split(",")[0], str(remap[int(r.split(",")[1])]), *r.split(",")[2:]]
+            )
+            for r in mot_rows
+        ]
+
+    mot_rows.sort(key=lambda s: (int(s.split(",")[0]), int(s.split(",")[1])))
+
+    gt_dir = output_dir / "gt"
+    gt_dir.mkdir(exist_ok=True)
+    (gt_dir / "gt.txt").write_text("\n".join(mot_rows) + ("\n" if mot_rows else ""))
+
+    seq_cfg = configparser.ConfigParser()
+    seq_cfg["Sequence"] = {
+        "name": scene_dir.name,
+        "imDir": str(scene_dir.resolve()),
+        "frameRate": str(FRAME_RATE),
+        "seqLength": str(len(frames)),
+        "imWidth": str(img_w),
+        "imHeight": str(img_h),
+        "imExt": frames[0].suffix,
+    }
+    with open(output_dir / "seqinfo.ini", "w") as f:
+        seq_cfg.write(f)
+
+    unique_tracks = len({int(r.split(",")[1]) for r in mot_rows})
+    return {
+        "scene": scene_dir.name,
+        "frames": len(frames),
+        "tracks": unique_tracks,
+        "rows": len(mot_rows),
+    }
 
 
-def main() -> None:
+# ── main ──────────────────────────────────────────────────────────────────────
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Auto-label frames with SAM3 text-prompted segmentation (COCO format)"
+        description="SAM3 video tracking → scene-level MOT gt.txt (5 fps)"
     )
     parser.add_argument(
-        "--raw-frames-dir",
-        type=Path,
-        default=Path("dataset/raw_frames"),
+        "--raw-frames-dir", type=Path, default=Path("dataset/main/raw_frames_5fps")
     )
     parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("dataset/labels"),
+        "--output-dir", type=Path, default=Path("dataset/MOT_labels_sam3_5fps")
     )
+    parser.add_argument("--model", type=str, default="sam3.pt")
     parser.add_argument("--text-prompt", type=str, default="person")
+    parser.add_argument("--conf", type=float, default=0.25)
+    parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument(
-        "--splits",
-        nargs="+",
-        default=["train", "test", "challange"],
+        "--part-size",
+        type=int,
+        default=55,
+        help="Frames per SAM3 video part (50–60 recommended).",
     )
-    parser.add_argument("--batch-size", type=int, default=4)
-    parser.add_argument("--threshold", type=float, default=0.5)
-    parser.add_argument("--mask-threshold", type=float, default=0.5)
     parser.add_argument(
-        "--segmentation-format",
-        choices=["rle", "polygon"],
-        default="rle",
+        "--min-track-len",
+        type=int,
+        default=3,
+        help="Remove tracks shorter than this many frames.",
     )
-    parser.add_argument("--model-id", type=str, default="facebook/sam3")
+    parser.add_argument("--splits", nargs="+", default=None)
+    parser.add_argument("--scenes", nargs="+", default=None)
+    parser.add_argument("--exclude", nargs="+", default=None, metavar="PATTERN")
+    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Device: {device}")
-    print(f"Loading SAM3 from {args.model_id} ...")
+    if not args.raw_frames_dir.exists():
+        print(f"ERROR: not found: {args.raw_frames_dir}", file=sys.stderr)
+        return 1
 
-    hf_token = os.environ.get("HF_TOKEN")
-    model = Sam3Model.from_pretrained(args.model_id, token=hf_token).to(device)
-    processor = Sam3Processor.from_pretrained(args.model_id, token=hf_token)
-    model.eval()
+    from ultralytics.models.sam import SAM3VideoSemanticPredictor
 
-    print(f"Text prompt: '{args.text_prompt}'")
-    print(f"Segmentation format: {args.segmentation_format}")
-    print(f"Confidence threshold: {args.threshold} | Mask threshold: {args.mask_threshold}")
-
-    t0 = time.time()
-    for split in args.splits:
-        process_split(
-            model=model,
-            processor=processor,
-            raw_frames_dir=args.raw_frames_dir,
-            output_dir=args.output_dir,
-            split=split,
-            text_prompt=args.text_prompt,
-            batch_size=args.batch_size,
-            threshold=args.threshold,
-            mask_threshold=args.mask_threshold,
-            seg_format=args.segmentation_format,
-            device=device,
+    predictor = SAM3VideoSemanticPredictor(
+        overrides=dict(
+            conf=args.conf,
+            task="segment",
+            mode="predict",
+            model=args.model,
+            imgsz=args.imgsz,
+            half=True,
+            verbose=False,
         )
+    )
 
-    print(f"\nAll done in {time.time() - t0:.1f}s")
+    print(f"Model       : {args.model}  prompt='{args.text_prompt}'  conf={args.conf}")
+    print(
+        f"Part size   : {args.part_size} frames  |  min-track-len={args.min_track_len}"
+    )
+    print(f"Input       : {args.raw_frames_dir}")
+    print(f"Output      : {args.output_dir}")
+
+    split_dirs = sorted(d for d in args.raw_frames_dir.iterdir() if d.is_dir())
+    if args.splits:
+        split_dirs = [s for s in split_dirs if s.name in set(args.splits)]
+    if not split_dirs:
+        print("No splits found.", file=sys.stderr)
+        return 1
+
+    total_scenes = total_tracks = total_rows = 0
+
+    for split_dir in split_dirs:
+        scenes = sorted(d for d in split_dir.iterdir() if d.is_dir())
+        if args.scenes:
+            scenes = [s for s in scenes if s.name in set(args.scenes)]
+        if args.exclude:
+            scenes = [
+                s
+                for s in scenes
+                if not any(fnmatch.fnmatch(s.name, pat) for pat in args.exclude)
+            ]
+
+        print(f"\n── {split_dir.name} ({len(scenes)} scenes) ──")
+
+        for scene_dir in tqdm(scenes, desc=split_dir.name, unit="scene"):
+            out_scene = args.output_dir / split_dir.name / scene_dir.name
+            gt_file = out_scene / "gt" / "gt.txt"
+
+            if gt_file.exists() and not args.overwrite:
+                tqdm.write(f"  skip (exists): {scene_dir.name}")
+                continue
+
+            tqdm.write(f"  {scene_dir.name}")
+
+            stats = run_scene(
+                scene_dir=scene_dir,
+                output_dir=out_scene,
+                predictor=predictor,
+                args=args,
+            )
+
+            tqdm.write(
+                f"  → {stats['frames']} frames | "
+                f"{stats['tracks']} tracks | "
+                f"{stats['rows']} annotations"
+            )
+            total_scenes += 1
+            total_tracks += stats["tracks"]
+            total_rows += stats["rows"]
+
+    print(f"\n{'─' * 60}")
+    print(
+        f"Done. Scenes: {total_scenes} | Tracks: {total_tracks} | Annotations: {total_rows}"
+    )
+    print(f"Output: {args.output_dir.resolve()}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

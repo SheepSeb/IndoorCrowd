@@ -1,53 +1,59 @@
 #!/usr/bin/env python3
-"""Auto-label pipeline: SAM3 detections → BoT-SORT → post-processing → MOT gt.txt.
+"""SAM3 detection + BoT-SORT tracking → MOT gt.txt for raw_frames_5fps.
 
-Replaces ByteTrack with BoT-SORT (Aharon et al., 2022), which adds:
-  - Global Motion Compensation (GMC / sparseOptFlow) for camera-motion robustness
-  - Kalman-filter state prediction (same as ByteTrack)
-  - Two-stage high/low confidence association
+Pipeline
+--------
+For each scene in dataset/raw_frames_5fps:
+  1. Split frames into parts of ~PART_SIZE frames.
+  2. Write a temporary MP4 per part (SAM3VideoSemanticPredictor requires video).
+  3. Run SAM3VideoSemanticPredictor with text="person", collect raw per-frame
+     bounding boxes (SAM3 internal track IDs are discarded).
+  4. Run BoT-SORT across all frames of the scene (combining parts) to assign
+     temporally consistent IDs with Global Motion Compensation.
+  5. Apply 7-step post-processing (NMS → conf filter → short tracks → gap
+     linking → short tracks → NMS → compact ID remapping).
+  6. Write scene-level MOT gt.txt + seqinfo.ini.
 
-Post-processing pipeline (applied after tracking):
-  1. Per-frame NMS          — aggressive IoU suppression to kill duplicate boxes
-  2. Confidence filter      — drop boxes below min_conf
-  3. Short-track removal    — drop tracks shorter than min_track_len frames
-  4. IoU gap-linking        — merge split tracklets across short temporal gaps
-  5. Short-track removal    — second pass after merging
-  6. Final per-frame NMS    — catch any remaining duplicates introduced by merging
-  7. Compact ID remapping   — renumber surviving tracks 1, 2, 3, …
-
-Output layout (MOT Challenge format)
---------------------------------------
-  dataset/MOT_labels_sam3_botsort/
+Output layout
+-------------
+  dataset/MOT_labels_sam3_botsort_5fps/
     {split}/
       {scene}/
-        gt/gt.txt       ← frame,id,x,y,w,h,conf,-1,-1,-1
+        gt/gt.txt        ← frame,id,x,y,w,h,conf,-1,-1,-1  (1-based frames)
         seqinfo.ini
 
 Usage
 -----
-  uv run python labelling/autolabel_sam3_botsort.py
+  # All splits / scenes
+  uv run python labelling/autolabel_sam3_botsort_5fps.py
 
-  uv run python labelling/autolabel_sam3_botsort.py \\
-      --sam3-labels-dir dataset/labels_3fps \\
-      --raw-frames-dir  dataset/raw_frames_3fps \\
-      --output-dir      dataset/MOT_labels_sam3_botsort
+  # Custom paths
+  uv run python labelling/autolabel_sam3_botsort_5fps.py \\
+      --raw-frames-dir dataset/raw_frames_5fps \\
+      --output-dir     dataset/MOT_labels_sam3_botsort_5fps
 
-  # Tune post-processing
-  uv run python labelling/autolabel_sam3_botsort.py \\
-      --nms-iou-thresh  0.40 \\
-      --min-conf        0.40 \\
-      --min-track-len   3    \\
-      --max-gap         6    \\
-      --link-iou-thresh 0.20
+  # Specific split / scene
+  uv run python labelling/autolabel_sam3_botsort_5fps.py \\
+      --splits train \\
+      --scenes acs_s1_recording_2026-02-23_17-15-46 \\
+      --overwrite
 
   # Tune BoT-SORT
-  uv run python labelling/autolabel_sam3_botsort.py \\
+  uv run python labelling/autolabel_sam3_botsort_5fps.py \\
       --track-high-thresh 0.35 \\
       --track-low-thresh  0.05 \\
       --new-track-thresh  0.40 \\
-      --track-buffer      30   \\
+      --track-buffer      50   \\
       --match-thresh      0.80 \\
       --gmc-method        sparseOptFlow
+
+  # Tune post-processing
+  uv run python labelling/autolabel_sam3_botsort_5fps.py \\
+      --nms-iou-thresh  0.40 \\
+      --min-conf        0.40 \\
+      --min-track-len   5    \\
+      --max-gap         10   \\
+      --link-iou-thresh 0.20
 """
 
 from __future__ import annotations
@@ -55,7 +61,6 @@ from __future__ import annotations
 import argparse
 import configparser
 import fnmatch
-import json
 import sys
 import types
 from collections import defaultdict
@@ -67,6 +72,7 @@ import torch
 from tqdm import tqdm
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+FRAME_RATE = 5  # dataset is sampled at 5 fps
 
 
 # ── BoT-SORT detection wrapper ────────────────────────────────────────────────
@@ -80,7 +86,7 @@ class _Detections:
         self._xyxy = xyxy.astype(np.float32)
         self.conf = torch.from_numpy(conf.astype(np.float32))
         self.cls = torch.from_numpy(cls.astype(np.float32))
-        # centre-format xywh required by init_track
+        # Centre-format xywh required by BOTSORT.init_track
         cx = (xyxy[:, 0] + xyxy[:, 2]) / 2
         cy = (xyxy[:, 1] + xyxy[:, 3]) / 2
         w = xyxy[:, 2] - xyxy[:, 0]
@@ -106,7 +112,7 @@ _EMPTY = _Detections(
 )
 
 
-def _make_botsort(args) -> "BOTSORT":
+def _make_botsort(args):
     from ultralytics.trackers.bot_sort import BOTSORT
 
     ns = types.SimpleNamespace(
@@ -145,19 +151,9 @@ def _nms_frame(
     boxes: list[tuple[int, list[float], float]],
     iou_thresh: float,
 ) -> set[int]:
-    """
-    Greedy NMS over one frame's boxes.
-
-    Args:
-        boxes: [(track_id, [x,y,w,h], conf), ...]
-        iou_thresh: suppress if IoU > this
-
-    Returns:
-        Set of track_ids whose box in this frame should be *kept*.
-    """
+    """Greedy NMS over one frame's boxes. Returns set of surviving track IDs."""
     if not boxes:
         return set()
-    # Sort by confidence descending
     order = sorted(range(len(boxes)), key=lambda i: boxes[i][2], reverse=True)
     suppressed = [False] * len(boxes)
     kept: set[int] = set()
@@ -179,8 +175,9 @@ def _nms_frame(
 TrackData = dict[int, list[dict]]  # {track_id: [{frame, bbox, conf}, ...]}
 
 
-def _build_by_frame(tracks: TrackData) -> dict[int, list[tuple[int, list[float], float]]]:
-    """Invert tracks → {frame: [(tid, bbox, conf), ...]}."""
+def _build_by_frame(
+    tracks: TrackData,
+) -> dict[int, list[tuple[int, list[float], float]]]:
     by_frame: dict[int, list] = defaultdict(list)
     for tid, rows in tracks.items():
         for r in rows:
@@ -189,14 +186,11 @@ def _build_by_frame(tracks: TrackData) -> dict[int, list[tuple[int, list[float],
 
 
 def step_nms(tracks: TrackData, iou_thresh: float) -> TrackData:
-    """Per-frame greedy NMS: remove a track's box for frames where it is suppressed."""
     by_frame = _build_by_frame(tracks)
-    # Which (frame, tid) entries survive?
     survivors: set[tuple[int, int]] = set()
     for fnum, boxes in by_frame.items():
         for tid in _nms_frame(boxes, iou_thresh):
             survivors.add((fnum, tid))
-    # Rebuild tracks keeping only surviving boxes
     out: TrackData = {}
     for tid, rows in tracks.items():
         kept = [r for r in rows if (r["frame"], tid) in survivors]
@@ -206,7 +200,6 @@ def step_nms(tracks: TrackData, iou_thresh: float) -> TrackData:
 
 
 def step_conf_filter(tracks: TrackData, min_conf: float) -> TrackData:
-    """Drop individual boxes below min_conf; remove tracks that become empty."""
     out: TrackData = {}
     for tid, rows in tracks.items():
         kept = [r for r in rows if r["conf"] >= min_conf]
@@ -216,7 +209,6 @@ def step_conf_filter(tracks: TrackData, min_conf: float) -> TrackData:
 
 
 def step_short_track_removal(tracks: TrackData, min_len: int) -> TrackData:
-    """Remove tracks that appear in fewer than min_len frames."""
     return {tid: rows for tid, rows in tracks.items() if len(rows) >= min_len}
 
 
@@ -226,15 +218,10 @@ def step_gap_linking(
     link_iou_thresh: float,
 ) -> TrackData:
     """
-    Merge pairs of tracklets (A → B) where:
-      - A ends before B starts
-      - gap between them ≤ max_gap frames
-      - IoU(last box of A, first box of B) ≥ link_iou_thresh
-
-    Linking is greedy: processes pairs ordered by gap size (shortest first),
-    and a track can only be merged once as a recipient.
+    Merge tracklet pairs (A → B) where A ends before B starts,
+    gap ≤ max_gap, and IoU(last_box_A, first_box_B) ≥ link_iou_thresh.
+    Greedy: shortest gaps first; each track merges at most once.
     """
-    # Summarise each track: first frame, last frame, first/last bbox
     summary: dict[int, dict] = {}
     for tid, rows in tracks.items():
         srows = sorted(rows, key=lambda r: r["frame"])
@@ -245,13 +232,11 @@ def step_gap_linking(
             "last_bbox": srows[-1]["bbox"],
         }
 
-    # Build candidate merge pairs (A absorbs B)
     tids = sorted(summary)
     candidates: list[tuple[int, int, int]] = []  # (gap, A, B)
     for i, a in enumerate(tids):
-        for b in tids[i + 1:]:
+        for b in tids[i + 1 :]:
             sa, sb = summary[a], summary[b]
-            # A must end before B starts
             if sa["last"] >= sb["first"]:
                 continue
             gap = sb["first"] - sa["last"]
@@ -261,11 +246,9 @@ def step_gap_linking(
             if iou >= link_iou_thresh:
                 candidates.append((gap, a, b))
 
-    # Sort by gap (prefer small gaps)
     candidates.sort()
 
-    # Greedy merge: each track can be merged into at most one other
-    merged_into: dict[int, int] = {}  # source → target
+    merged_into: dict[int, int] = {}
 
     def _root(tid: int) -> int:
         while tid in merged_into:
@@ -275,22 +258,18 @@ def step_gap_linking(
     for gap, a, b in candidates:
         ra, rb = _root(a), _root(b)
         if ra == rb:
-            continue  # already same track
-        # Absorb rb into ra
+            continue
         merged_into[rb] = ra
 
-    # Apply merges
     out: TrackData = defaultdict(list)
     for tid, rows in tracks.items():
         target = _root(tid)
         out[target].extend(rows)
 
-    # Re-sort rows by frame within each merged track
     return {tid: sorted(rows, key=lambda r: r["frame"]) for tid, rows in out.items()}
 
 
 def step_remap_ids(tracks: TrackData) -> TrackData:
-    """Renumber track IDs compactly starting from 1."""
     new_id = {old: new for new, old in enumerate(sorted(tracks), start=1)}
     return {new_id[tid]: rows for tid, rows in tracks.items()}
 
@@ -303,8 +282,10 @@ def postprocess(
     max_gap: int,
     link_iou_thresh: float,
 ) -> tuple[TrackData, dict]:
-    """Full post-processing pipeline. Returns (tracks, stats)."""
-    def _counts(t): return {"tracks": len(t), "boxes": sum(len(r) for r in t.values())}
+    """Full 7-step post-processing pipeline. Returns (tracks, stats)."""
+
+    def _counts(t):
+        return {"tracks": len(t), "boxes": sum(len(r) for r in t.values())}
 
     s0 = _counts(tracks)
 
@@ -329,79 +310,141 @@ def postprocess(
     tracks = step_remap_ids(tracks)
 
     stats = {
-        "raw":          s0,
-        "after_nms1":   s1,
-        "after_conf":   s2,
+        "raw": s0,
+        "after_nms1": s1,
+        "after_conf": s2,
         "after_short1": s3,
-        "after_link":   s4,
+        "after_link": s4,
         "after_short2": s5,
-        "after_nms2":   s6,
-        "final":        _counts(tracks),
+        "after_nms2": s6,
+        "final": _counts(tracks),
     }
     return tracks, stats
 
 
-# ── Scene processing ──────────────────────────────────────────────────────────
+# ── Frame / video helpers ─────────────────────────────────────────────────────
 
 
-def frame_number_from_name(file_name: str) -> int:
-    stem = Path(file_name).stem
-    digits = "".join(c for c in stem if c.isdigit())
+def collect_frames(scene_dir: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in scene_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+    )
+
+
+def frame_number(frame_path: Path) -> int:
+    digits = "".join(c for c in frame_path.stem if c.isdigit())
     return int(digits) if digits else 0
 
 
+def write_video(frames: list[Path], out_path: Path, fps: int) -> tuple[int, int]:
+    """Write frame images to an MP4 file. Returns (width, height)."""
+    first = cv2.imread(str(frames[0]))
+    h, w = first.shape[:2]
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(out_path), fourcc, fps, (w, h))
+    for f in frames:
+        img = cv2.imread(str(f))
+        if img is not None:
+            writer.write(img)
+    writer.release()
+    return w, h
+
+
+# ── SAM3 detection per part ───────────────────────────────────────────────────
+
+
+def detect_part(
+    part_frames: list[Path],
+    predictor,
+    text_prompt: str,
+    tmp_dir: Path,
+) -> list[tuple[Path, list[tuple[np.ndarray, float]]]]:
+    """
+    Run SAM3VideoSemanticPredictor on one part of frames.
+
+    Returns [(frame_path, [(xyxy, conf), ...]), ...] in frame order.
+    SAM3 internal track IDs are discarded; only bboxes + scores are kept.
+    """
+    tmp_video = tmp_dir / "_part_tmp.mp4"
+    write_video(part_frames, tmp_video, fps=FRAME_RATE)
+
+    # Reset tracker state between parts to prevent ID leakage
+    predictor.inference_state = {}
+
+    results_gen = predictor(source=str(tmp_video), text=[text_prompt], stream=True)
+
+    frame_dets: list[tuple[Path, list[tuple[np.ndarray, float]]]] = []
+    for frame_path, result in zip(part_frames, results_gen):
+        dets: list[tuple[np.ndarray, float]] = []
+        if result.boxes is not None and len(result.boxes) > 0:
+            boxes_xyxy = result.boxes.xyxy.cpu().numpy()
+            scores = result.boxes.conf.cpu().numpy()
+            for box, score in zip(boxes_xyxy, scores):
+                dets.append((box.astype(np.float32), float(score)))
+        frame_dets.append((frame_path, dets))
+
+    tmp_video.unlink(missing_ok=True)
+    return frame_dets
+
+
+# ── Scene-level processing ────────────────────────────────────────────────────
+
+
 def run_scene(
-    coco_path: Path,
-    scene_name: str,
-    raw_frames_dir: Path,
+    scene_dir: Path,
     output_dir: Path,
+    predictor,
     args,
 ) -> dict:
-    with open(coco_path) as f:
-        coco = json.load(f)
+    frames = collect_frames(scene_dir)
+    if not frames:
+        return {"scene": scene_dir.name, "frames": 0, "tracks": 0, "rows": 0}
 
-    images = coco.get("images", [])
-    if not images:
-        return {"scene": scene_name, "frames": 0, "tracks": 0, "rows": 0}
-
-    # Group SAM3 detections by image_id
-    anns_by_img: dict[int, list[tuple[np.ndarray, float]]] = defaultdict(list)
-    for ann in coco.get("annotations", []):
-        x, y, w, h = ann["bbox"]
-        xyxy = np.array([x, y, x + w, y + h], dtype=np.float32)
-        anns_by_img[ann["image_id"]].append((xyxy, float(ann.get("score", 1.0))))
-
-    images_sorted = sorted(images, key=lambda img: img["file_name"])
-    img_w = images_sorted[0].get("width", 0)
-    img_h = images_sorted[0].get("height", 0)
+    # Determine image dimensions from first frame
+    first_img = cv2.imread(str(frames[0]))
+    img_h, img_w = first_img.shape[:2]
 
     # Write seqinfo.ini
-    split_part = images_sorted[0]["file_name"].split("/")[0]
-    scene_frames_dir = raw_frames_dir / split_part / scene_name
     output_dir.mkdir(parents=True, exist_ok=True)
     seq_cfg = configparser.ConfigParser()
     seq_cfg["Sequence"] = {
-        "name": scene_name,
-        "imDir": str(scene_frames_dir.resolve()),
-        "frameRate": str(args.frame_rate),
-        "seqLength": str(len(images_sorted)),
+        "name": scene_dir.name,
+        "imDir": str(scene_dir.resolve()),
+        "frameRate": str(FRAME_RATE),
+        "seqLength": str(len(frames)),
         "imWidth": str(img_w),
         "imHeight": str(img_h),
-        "imExt": ".jpg",
+        "imExt": frames[0].suffix,
     }
     with open(output_dir / "seqinfo.ini", "w") as f:
         seq_cfg.write(f)
 
-    # Run BoT-SORT
-    tracker = _make_botsort(args)
+    # --- Step 1: Run SAM3 part-by-part to collect raw per-frame detections ---
+    parts = [
+        frames[i : i + args.part_size] for i in range(0, len(frames), args.part_size)
+    ]
 
+    # Map frame_path → list of (xyxy, conf) detections
+    all_frame_dets: dict[Path, list[tuple[np.ndarray, float]]] = {}
+    for part_idx, part_frames in enumerate(parts, start=1):
+        tqdm.write(
+            f"    SAM3 part {part_idx}/{len(parts)}"
+            f"  [{part_frames[0].name}…{part_frames[-1].name}]"
+            f"  ({len(part_frames)} frames)"
+        )
+        part_dets = detect_part(part_frames, predictor, args.text_prompt, output_dir)
+        for fpath, dets in part_dets:
+            all_frame_dets[fpath] = dets
+
+    # --- Step 2: Run BoT-SORT across all frames in scene order ---------------
+    tracker = _make_botsort(args)
     raw_tracks: TrackData = defaultdict(list)
 
-    for img_info in images_sorted:
-        img_id = img_info["id"]
-        fnum = frame_number_from_name(img_info["file_name"])
+    for fnum, frame_path in enumerate(frames, start=1):
+        dets_list = all_frame_dets.get(frame_path, [])
 
-        dets_list = anns_by_img.get(img_id, [])
         if dets_list:
             xyxy = np.stack([d[0] for d in dets_list])
             conf = np.array([d[1] for d in dets_list], dtype=np.float32)
@@ -411,7 +454,6 @@ def run_scene(
             dets = _EMPTY
 
         # Load grayscale frame for GMC (sparseOptFlow)
-        frame_path = raw_frames_dir / img_info["file_name"]
         if frame_path.exists():
             gray = cv2.imread(str(frame_path), cv2.IMREAD_GRAYSCALE)
         else:
@@ -421,16 +463,22 @@ def run_scene(
 
         for row in result:
             x1, y1, x2, y2, tid, conf_val = (
-                float(row[0]), float(row[1]), float(row[2]), float(row[3]),
-                int(row[4]), float(row[5]),
+                float(row[0]),
+                float(row[1]),
+                float(row[2]),
+                float(row[3]),
+                int(row[4]),
+                float(row[5]),
             )
-            raw_tracks[tid].append({
-                "frame": fnum,
-                "bbox": [x1, y1, x2 - x1, y2 - y1],
-                "conf": conf_val,
-            })
+            raw_tracks[tid].append(
+                {
+                    "frame": fnum,
+                    "bbox": [x1, y1, x2 - x1, y2 - y1],
+                    "conf": conf_val,
+                }
+            )
 
-    # Post-processing
+    # --- Step 3: Post-processing ---------------------------------------------
     tracks, pp_stats = postprocess(
         dict(raw_tracks),
         nms_iou_thresh=args.nms_iou_thresh,
@@ -440,7 +488,7 @@ def run_scene(
         link_iou_thresh=args.link_iou_thresh,
     )
 
-    # Write gt.txt
+    # --- Step 4: Write gt.txt ------------------------------------------------
     gt_rows: list[str] = []
     for tid, rows in sorted(tracks.items()):
         for r in sorted(rows, key=lambda x: x["frame"]):
@@ -456,8 +504,8 @@ def run_scene(
     (gt_dir / "gt.txt").write_text("\n".join(gt_rows) + ("\n" if gt_rows else ""))
 
     return {
-        "scene": scene_name,
-        "frames": len(images_sorted),
+        "scene": scene_dir.name,
+        "frames": len(frames),
         "tracks": len(tracks),
         "rows": len(gt_rows),
         "pp": pp_stats,
@@ -469,70 +517,161 @@ def run_scene(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="SAM3 detections + BoT-SORT + post-processing → MOT gt.txt"
+        description="SAM3 detection + BoT-SORT tracking → MOT gt.txt (5 fps)"
     )
 
     # Paths
-    parser.add_argument("--sam3-labels-dir", type=Path, default=Path("dataset/labels_3fps"))
-    parser.add_argument("--raw-frames-dir",  type=Path, default=Path("dataset/raw_frames_3fps"))
-    parser.add_argument("--output-dir",      type=Path, default=Path("dataset/MOT_labels_sam3_botsort"))
+    parser.add_argument(
+        "--raw-frames-dir", type=Path, default=Path("dataset/main/raw_frames_5fps")
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("dataset/main/MOT_labels_sam3_botsort_5fps"),
+    )
+
+    # SAM3 parameters
+    parser.add_argument("--model", type=str, default="sam3.pt")
+    parser.add_argument("--text-prompt", type=str, default="person")
+    parser.add_argument(
+        "--conf", type=float, default=0.25, help="SAM3 detection confidence threshold."
+    )
+    parser.add_argument("--imgsz", type=int, default=640)
+    parser.add_argument(
+        "--part-size",
+        type=int,
+        default=55,
+        help="Frames per SAM3 video part (50-60 recommended).",
+    )
 
     # BoT-SORT parameters
-    parser.add_argument("--track-high-thresh", type=float, default=0.35,
-                        help="High-conf detections → stage-1 association.")
-    parser.add_argument("--track-low-thresh",  type=float, default=0.05,
-                        help="Low-conf detections → stage-2 association.")
-    parser.add_argument("--new-track-thresh",  type=float, default=0.40,
-                        help="Minimum score to start a new track.")
-    parser.add_argument("--track-buffer",      type=int,   default=30,
-                        help="Frames a lost track is kept alive.")
-    parser.add_argument("--match-thresh",      type=float, default=0.80,
-                        help="IoU threshold for Hungarian assignment.")
-    parser.add_argument("--proximity-thresh",  type=float, default=0.50,
-                        help="Proximity threshold for appearance gating.")
-    parser.add_argument("--gmc-method", type=str, default="sparseOptFlow",
-                        choices=["sparseOptFlow", "orb", "sift", "ecc", "off"],
-                        help="Global Motion Compensation method.")
-    parser.add_argument("--frame-rate", type=int, default=3)
+    parser.add_argument(
+        "--track-high-thresh",
+        type=float,
+        default=0.35,
+        help="High-conf detections → stage-1 association.",
+    )
+    parser.add_argument(
+        "--track-low-thresh",
+        type=float,
+        default=0.05,
+        help="Low-conf detections → stage-2 association.",
+    )
+    parser.add_argument(
+        "--new-track-thresh",
+        type=float,
+        default=0.40,
+        help="Minimum score to start a new track.",
+    )
+    parser.add_argument(
+        "--track-buffer",
+        type=int,
+        default=50,
+        help="Frames a lost track is kept alive (higher for 5fps).",
+    )
+    parser.add_argument(
+        "--match-thresh",
+        type=float,
+        default=0.80,
+        help="IoU threshold for Hungarian assignment.",
+    )
+    parser.add_argument(
+        "--proximity-thresh",
+        type=float,
+        default=0.50,
+        help="Proximity threshold for appearance gating.",
+    )
+    parser.add_argument(
+        "--gmc-method",
+        type=str,
+        default="sparseOptFlow",
+        choices=["sparseOptFlow", "orb", "sift", "ecc", "off"],
+        help="Global Motion Compensation method.",
+    )
+    parser.add_argument(
+        "--frame-rate",
+        type=int,
+        default=FRAME_RATE,
+        help="Frame rate passed to BoT-SORT Kalman filter.",
+    )
 
     # Post-processing parameters
-    parser.add_argument("--nms-iou-thresh",  type=float, default=0.40,
-                        help="IoU threshold for per-frame NMS (aggressive: lower = stricter).")
-    parser.add_argument("--min-conf",        type=float, default=0.40,
-                        help="Drop boxes below this confidence after tracking.")
-    parser.add_argument("--min-track-len",   type=int,   default=3,
-                        help="Minimum frames a track must span to survive.")
-    parser.add_argument("--max-gap",         type=int,   default=6,
-                        help="Maximum frame gap to attempt IoU-based tracklet linking.")
-    parser.add_argument("--link-iou-thresh", type=float, default=0.20,
-                        help="Minimum IoU between last/first box to link two tracklets.")
-    parser.add_argument("--verbose-pp", action="store_true",
-                        help="Print per-scene post-processing breakdown.")
+    parser.add_argument("--nms-iou-thresh", type=float, default=0.40)
+    parser.add_argument(
+        "--min-conf",
+        type=float,
+        default=0.40,
+        help="Drop boxes below this confidence after tracking.",
+    )
+    parser.add_argument(
+        "--min-track-len",
+        type=int,
+        default=5,
+        help="Minimum frames a track must span to survive.",
+    )
+    parser.add_argument(
+        "--max-gap",
+        type=int,
+        default=10,
+        help="Maximum frame gap for IoU-based tracklet linking.",
+    )
+    parser.add_argument(
+        "--link-iou-thresh",
+        type=float,
+        default=0.20,
+        help="Minimum IoU to link two tracklets across a gap.",
+    )
+    parser.add_argument(
+        "--verbose-pp",
+        action="store_true",
+        help="Print per-scene post-processing breakdown.",
+    )
 
     # Scene selection
     parser.add_argument("--splits", nargs="+", default=None)
     parser.add_argument("--scenes", nargs="+", default=None)
     parser.add_argument("--exclude", nargs="+", default=None, metavar="PATTERN")
     parser.add_argument("--overwrite", action="store_true")
+
     args = parser.parse_args()
 
-    if not args.sam3_labels_dir.exists():
-        print(f"ERROR: SAM3 labels dir not found: {args.sam3_labels_dir}", file=sys.stderr)
+    if not args.raw_frames_dir.exists():
+        print(
+            f"ERROR: raw frames dir not found: {args.raw_frames_dir}", file=sys.stderr
+        )
         return 1
 
-    print(f"SAM3 labels : {args.sam3_labels_dir}")
-    print(f"Output      : {args.output_dir}")
-    print(f"BoT-SORT    : high={args.track_high_thresh} low={args.track_low_thresh} "
-          f"new={args.new_track_thresh} buffer={args.track_buffer} "
-          f"match={args.match_thresh} gmc={args.gmc_method}")
-    print(f"Post-proc   : nms_iou={args.nms_iou_thresh} min_conf={args.min_conf} "
-          f"min_len={args.min_track_len} max_gap={args.max_gap} "
-          f"link_iou={args.link_iou_thresh}")
+    # Load SAM3 model once
+    from ultralytics.models.sam import SAM3VideoSemanticPredictor
 
-    split_dirs = sorted(
-        d for d in args.sam3_labels_dir.iterdir()
-        if d.is_dir() and d.name != "session_logs"
+    overrides = dict(
+        conf=args.conf,
+        task="segment",
+        mode="predict",
+        model=args.model,
+        imgsz=args.imgsz,
+        half=True,
+        verbose=False,
     )
+    predictor = SAM3VideoSemanticPredictor(overrides=overrides)
+
+    print(f"Model       : {args.model}  (text='{args.text_prompt}'  conf={args.conf})")
+    print(f"Part size   : {args.part_size} frames")
+    print(
+        f"BoT-SORT    : high={args.track_high_thresh} low={args.track_low_thresh} "
+        f"new={args.new_track_thresh} buffer={args.track_buffer} "
+        f"match={args.match_thresh} gmc={args.gmc_method}"
+    )
+    print(
+        f"Post-proc   : nms_iou={args.nms_iou_thresh} min_conf={args.min_conf} "
+        f"min_len={args.min_track_len} max_gap={args.max_gap} "
+        f"link_iou={args.link_iou_thresh}"
+    )
+    print(f"Input       : {args.raw_frames_dir}")
+    print(f"Output      : {args.output_dir}")
+
+    # Discover splits / scenes
+    split_dirs = sorted(d for d in args.raw_frames_dir.iterdir() if d.is_dir())
     if args.splits:
         split_dirs = [s for s in split_dirs if s.name in set(args.splits)]
     if not split_dirs:
@@ -542,38 +681,38 @@ def main() -> int:
     total_scenes = total_tracks = total_rows = 0
 
     for split_dir in split_dirs:
-        json_files = sorted(split_dir.glob("*.json"))
+        scenes = sorted(d for d in split_dir.iterdir() if d.is_dir())
         if args.scenes:
-            json_files = [j for j in json_files if j.stem in set(args.scenes)]
+            scenes = [s for s in scenes if s.name in set(args.scenes)]
         if args.exclude:
-            json_files = [
-                j for j in json_files
-                if not any(fnmatch.fnmatch(j.stem, pat) for pat in args.exclude)
+            scenes = [
+                s
+                for s in scenes
+                if not any(fnmatch.fnmatch(s.name, pat) for pat in args.exclude)
             ]
 
-        print(f"\n── {split_dir.name} ({len(json_files)} scenes) ──")
+        print(f"\n── {split_dir.name} ({len(scenes)} scenes) ──")
 
-        for coco_path in tqdm(json_files, desc=split_dir.name, unit="scene"):
-            scene_name = coco_path.stem
-            out_scene = args.output_dir / split_dir.name / scene_name
+        for scene_dir in tqdm(scenes, desc=split_dir.name, unit="scene"):
+            out_scene = args.output_dir / split_dir.name / scene_dir.name
             gt_file = out_scene / "gt" / "gt.txt"
 
             if gt_file.exists() and not args.overwrite:
-                tqdm.write(f"  skip (exists): {scene_name}")
+                tqdm.write(f"  skip (exists): {scene_dir.name}")
                 continue
 
+            tqdm.write(f"  {scene_dir.name}")
+
             stats = run_scene(
-                coco_path=coco_path,
-                scene_name=scene_name,
-                raw_frames_dir=args.raw_frames_dir,
+                scene_dir=scene_dir,
                 output_dir=out_scene,
+                predictor=predictor,
                 args=args,
             )
 
             pp = stats["pp"]
             tqdm.write(
-                f"  {stats['scene']}: "
-                f"{stats['frames']} frames | "
+                f"  → {stats['frames']} frames | "
                 f"{stats['tracks']} tracks | "
                 f"{stats['rows']} annotations"
             )
@@ -594,7 +733,9 @@ def main() -> int:
             total_rows += stats["rows"]
 
     print(f"\n{'─' * 60}")
-    print(f"Done.  Scenes: {total_scenes}  |  Tracks: {total_tracks}  |  Annotations: {total_rows}")
+    print(
+        f"Done.  Scenes: {total_scenes}  |  Tracks: {total_tracks}  |  Annotations: {total_rows}"
+    )
     print(f"Output: {args.output_dir.resolve()}")
     return 0
 

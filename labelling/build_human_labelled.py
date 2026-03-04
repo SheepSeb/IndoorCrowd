@@ -3,16 +3,12 @@
 Build a golden dataset by selecting up to N frames overall.
 
 Default behavior:
-- Input scenes:  dataset/raw_frames_3fps
-- Output scenes: dataset/golden_frames_3fps_mid
+- Input scenes:  dataset/raw_frames_5fps
+- Output scenes: dataset/golden_frames_5fps_mid
 - Label inputs:
-  - dataset/labels_3fps
-  - dataset/labels_efficient_grounded_sam_3fps
-  - dataset/labels_grounding_sam_3fps
+  - dataset/main/labels_sam3
 - Label outputs:
-  - dataset/labels_3fps_golden_mid
-  - dataset/labels_efficient_grounded_sam_3fps_golden_mid
-  - dataset/labels_grounding_sam_3fps_golden_mid
+  - dataset/main/labels_sam3_golden_mid
 - Max frames:    600 (overall cap across all scenes)
 """
 
@@ -29,17 +25,13 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 def parse_args() -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parent.parent
-    default_input = repo_root / "dataset" / "raw_frames_3fps"
-    default_output = repo_root / "dataset" / "golden_frames_3fps_mid"
+    default_input = repo_root / "dataset" / "main" / "raw_frames_5fps"
+    default_output = repo_root / "dataset" / "main" / "golden_frames_5fps_mid"
     default_label_inputs = [
-        repo_root / "dataset" / "labels_3fps",
-        repo_root / "dataset" / "labels_efficient_grounded_sam_3fps",
-        repo_root / "dataset" / "labels_grounding_sam_3fps",
+        repo_root / "dataset" / "main" / "labels_sam3",
     ]
     default_label_outputs = [
-        repo_root / "dataset" / "labels_3fps_golden_mid",
-        repo_root / "dataset" / "labels_efficient_grounded_sam_3fps_golden_mid",
-        repo_root / "dataset" / "labels_grounding_sam_3fps_golden_mid",
+        repo_root / "dataset" / "main" / "labels_sam3_golden_mid",
     ]
 
     parser = argparse.ArgumentParser(
@@ -67,8 +59,7 @@ def parse_args() -> argparse.Namespace:
         default=default_label_inputs,
         help=(
             "Input label roots to filter/copy for selected frames "
-            "(default: labels_3fps, labels_efficient_grounded_sam_3fps, "
-            "labels_grounding_sam_3fps)"
+            "(default: labels_sam3)"
         ),
     )
     parser.add_argument(
@@ -78,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         default=default_label_outputs,
         help=(
             "Output roots for filtered labels, same order as --label-inputs "
-            "(default: *_golden_mid variants)"
+            "(default: labels_sam3_golden_mid)"
         ),
     )
     parser.add_argument(
@@ -141,7 +132,8 @@ def select_frames_overall(
     while each scene contributes frames from its middle first.
     """
     prioritized = {
-        scene_dir: middle_priority_order(scene_frames[scene_dir]) for scene_dir in scene_dirs
+        scene_dir: middle_priority_order(scene_frames[scene_dir])
+        for scene_dir in scene_dirs
     }
     selected: dict[Path, list[Path]] = {scene_dir: [] for scene_dir in scene_dirs}
 
@@ -235,7 +227,8 @@ def copy_filtered_scene_labels(
     """
     relative_scene = scene_dir.relative_to(input_root)
     selected_relpaths = {
-        str((relative_scene / frame_path.name).as_posix()) for frame_path in selected_frames
+        str((relative_scene / frame_path.name).as_posix())
+        for frame_path in selected_frames
     }
 
     written = 0
