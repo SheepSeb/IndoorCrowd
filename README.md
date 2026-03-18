@@ -1,4 +1,4 @@
-# Yet Another Person Tracker
+# IndoorCrowd: A Multi-Scene Dataset for Human Detection, Segmentation, and Tracking with an Automated Annotation Pipeline
 
 A machine learning pipeline for automatically annotating people in video data using multiple state-of-the-art segmentation models. The project extracts frames, auto-labels them with several models, compares results against human annotations, and supports training a YOLO-based person detector.
 

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pdftoppm --version)",
+      "Bash(hash -r)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(pdftoppm -r 72 /Users/sebnae/workspace/IndoorCrowd/assets/paper.pdf /tmp/paper_page -f 1 -l 1)",
+      "Bash(pdftotext /Users/sebnae/workspace/IndoorCrowd/assets/paper.pdf /tmp/paper.txt)"
+    ]
+  }
+}
