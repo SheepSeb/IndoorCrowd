@@ -177,6 +177,18 @@ body {
   color: #000;
 }
 
+/* ─── Hugging Face dataset link ─────────────────────────────────────────── */
+.huggingface-dataset-link {
+  display: inline-flex;
+  align-items: center;
+  color: #0b5bd4;
+  text-decoration: none;
+  font-weight: 500;
+}
+.huggingface-dataset-link:hover {
+  text-decoration: underline;
+}
+
 /* ─── Density badge colours ─────────────────────────────────────────────── */
 .badge-dense   { background: #e63946; }
 .badge-medium  { background: #f4a261; }

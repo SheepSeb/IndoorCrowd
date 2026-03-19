@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Indoor room background -->
+  <rect x="2" y="4" width="28" height="24" rx="4" ry="4" fill="#1f2933"/>
+  <rect x="4.5" y="6.5" width="23" height="19" rx="3" ry="3" fill="#111827"/>
+
+  <!-- Floor -->
+  <rect x="4.5" y="21" width="23" height="4.5" fill="#0f766e"/>
+
+  <!-- Crowd of stylised people (three colors) -->
+  <!-- Left person -->
+  <circle cx="10" cy="13" r="2" fill="#fbbf24"/>
+  <path d="M10 15.5 l-2 3.5 h1.2 l0.8-1.4 l0.8 1.4 h1.2 l-2-3.5 z" fill="#fbbf24"/>
+
+  <!-- Center person (slightly taller, main focus) -->
+  <circle cx="16" cy="12.5" r="2.2" fill="#3b82f6"/>
+  <path d="M16 15.2 l-2.1 4.1 h1.2 l0.9-1.8 l0.9 1.8 h1.2 L16 15.2 z" fill="#3b82f6"/>
+
+  <!-- Right person -->
+  <circle cx="22" cy="13" r="2" fill="#f97316"/>
+  <path d="M22 15.5 l-2 3.5 h1.2 l0.8-1.4 l0.8 1.4 h1.2 l-2-3.5 z" fill="#f97316"/>
+
+  <!-- Subtle overhead light to suggest indoor scene -->
+  <rect x="10" y="7.5" width="12" height="1.6" rx="0.8" fill="#e5e7eb" opacity="0.85"/>
+</svg>
