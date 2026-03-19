@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+    content="IndoorCrowd: A multi-scene dataset for indoor human detection, instance segmentation, and multi-object tracking with an automated annotation pipeline.">
+  <meta name="keywords"
+    content="IndoorCrowd, dataset, human detection, instance segmentation, multi-object tracking, indoor, CVPR 2026">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IndoorCrowd: Indoor Human Detection, Segmentation &amp; Tracking Dataset</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <!-- Bulma + extensions -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-carousel@4.0.24/dist/css/bulma-carousel.min.css">
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+
+  <!-- Site styles -->
+  <link rel="stylesheet" href="./static/css/index.css">
+
+  <!-- Scripts -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bulma-carousel@4.0.24/dist/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/index.js" defer></script>
+</head>
+
+<body>
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  NAVIGATION                                                          ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <nav class="navbar" role="navigation" aria-label="main navigation">
+    <div class="navbar-brand">
+      <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
+    <div class="navbar-menu">
+      <div class="navbar-start" style="flex-grow:1; justify-content:center;">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">Sections</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#abstract">Abstract</a>
+            <a class="navbar-item" href="#dataset">Dataset</a>
+            <a class="navbar-item" href="#pipeline">Pipeline</a>
+            <a class="navbar-item" href="#autolabelling">Auto-Labelling</a>
+            <a class="navbar-item" href="#baselines">Baselines</a>
+            <a class="navbar-item" href="#BibTeX">BibTeX</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  HERO / TITLE                                                        ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+
+            <h1 class="title is-1 publication-title">
+              IndoorCrowd: A Multi-Scene Dataset for Human Detection, Segmentation, and Tracking with an Automated
+              Annotation Pipeline
+            </h1>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=VBogtPAAAAAJ&hl=en" target="_blank">Sebastian-Ion
+                  Nae</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://www.linkedin.com/in/radu-moldoveanu-r21/" target="_blank">Radu
+                  Moldoveanu</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=eSmiVNcAAAAJ&hl=en" target="_blank">Alexandra
+                  Stefania Ghita</a><sup>1</sup>,
+              </span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?user=b02NJb4AAAAJ&hl=fr" target="_blank">Adina Magda
+                  Florea</a><sup>1</sup>
+              </span>
+            </div>
+
+            <div class="is-size-5 publication-authors" style="margin-top:0.5rem;">
+              <span class="author-block"><sup>1</sup>National University of Science and Technology Politehnica
+                Bucharest, Romania</span>
+            </div>
+
+            <div class="is-size-5 publication-authors" style="margin-top:0.4rem;">
+              <span class="publication-venue">
+                <a href="https://sites.google.com/view/datacv-2026-cvpr/" target="_blank"
+                  style="color:inherit; text-decoration:none;">
+                  5th DataCV Workshop and Challenge
+                </a>
+                &nbsp;@&nbsp;<strong>CVPR 2026</strong>
+              </span>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="column has-text-centered" style="margin-top:1rem;">
+              <div class="publication-links">
+                <span class="link-block">
+                  <a href="./assets/paper.pdf" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://github.com/SheepSeb/IndoorCrowd"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fab fa-github"></i></span>
+                    <span>Code</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="#dataset" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="far fa-images"></i></span>
+                    <span>Dataset</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+            <!-- /Action buttons -->
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  EXAMPLE FRAMES TEASER                                               ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="hero teaser">
+    <div class="container is-max-desktop">
+      <div class="hero-body">
+        <figure class="image">
+          <img src="./static/images/image_samples_from_scenes.png"
+               alt="Representative sample frames from all IndoorCrowd scenes"
+               class="method-image">
+        </figure>
+        <h2 class="subtitle has-text-centered" style="margin-top:1.2rem;">
+          Representative raw frames from all four IndoorCrowd scenes, illustrating variation in viewpoint,
+          crowd density, and occlusion patterns.
+        </h2>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  SCENE CAROUSEL                                                      ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="hero is-light is-small">
+    <div class="hero-body">
+      <div class="container">
+        <div id="results-carousel" class="carousel results-carousel">
+
+          <div class="item">
+            <figure class="image" style="margin:0;">
+              <img src="./static/images/scene-acs-ec.jpg" alt="ACS-EC — dense atrium">
+            </figure>
+            <div style="padding:10px 14px; font-family:'Google Sans',sans-serif; font-size:0.9rem; background:#fff;">
+              <strong>ACS-EC</strong> — Dense multi-level atrium.
+              12.2 persons/frame on average; 79.3% dense frames.
+            </div>
+          </div>
+
+          <div class="item">
+            <figure class="image" style="margin:0;">
+              <img src="./static/images/scene-acs-eg.jpg" alt="ACS-EG — corridor">
+            </figure>
+            <div style="padding:10px 14px; font-family:'Google Sans',sans-serif; font-size:0.9rem; background:#fff;">
+              <strong>ACS-EG</strong> — Narrow corridor, ground-level camera.
+              Strong near-to-distal scale variance; 38.3% occlusion rate.
+            </div>
+          </div>
+
+          <div class="item">
+            <figure class="image" style="margin:0;">
+              <img src="./static/images/scene-ie-central.jpg" alt="IE-Central — entrance hall">
+            </figure>
+            <div style="padding:10px 14px; font-family:'Google Sans',sans-serif; font-size:0.9rem; background:#fff;">
+              <strong>IE-Central</strong> — Entrance hall, elevated camera angle.
+              Widest per-frame range: 4–17 persons; 23.5% dense frames.
+            </div>
+          </div>
+
+          <div class="item">
+            <figure class="image" style="margin:0;">
+              <img src="./static/images/scene-r-central.jpg" alt="R-Central — overhead atrium">
+            </figure>
+            <div style="padding:10px 14px; font-family:'Google Sans',sans-serif; font-size:0.9rem; background:#fff;">
+              <strong>R-Central</strong> — Central atrium, overhead viewpoint.
+              Structural columns produce regular partial occlusion; most uniform density scene.
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  ABSTRACT                                                            ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="abstract">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Abstract</h2>
+          <div class="content has-text-justified">
+            <p>
+              Understanding human behaviour in crowded indoor environments is a core challenge for
+              surveillance, smart-building applications, and human-robot interaction — all of which
+              depend on the ability to reliably detect, segment, and track individuals within complex,
+              dynamic social contexts. Yet existing datasets rarely capture the diversity and
+              difficulty of real-world indoor scenes at scale.
+            </p>
+            <p>
+              We introduce <strong>IndoorCrowd</strong>, a multi-scene dataset for indoor human
+              detection, instance segmentation, and multi-object tracking, collected across four
+              distinct indoor public locations within a campus (ACS-EC, ACS-EG, IE-Central,
+              R-Central). The dataset comprises 31 videos sampled at 5 fps, totalling
+              <strong>9,913 frames</strong> with human-verified, manually corrected per-instance
+              segmentation masks.
+            </p>
+            <p>
+              To characterise the quality of foundation-model-based auto-labelling in crowded indoor
+              scenes, we establish a control subset of <strong>620 frames annotated entirely by
+                humans</strong> and benchmark three automatic annotators —
+              <a href="https://arxiv.org/abs/2408.00714">SAM3</a>,
+              <a href="https://arxiv.org/abs/2401.14159">GroundingSAM</a>, and
+              EfficientGroundingSAM — against this ground truth using Cohen's κ, AP@0.5, AP@0.75,
+              precision, recall, and mask IoU per scene. An additional
+              <strong>2,552 frames</strong> form a multi-object tracking subset with human-verified
+              continuous identity tracks in MOTChallenge format. We further establish detection,
+              segmentation, and tracking baselines by pairing YOLOv8n, YOLOv26n, and RT-DETR-L with
+              ByteTrack, BoT-SORT, and OC-SORT across all four scenes.
+            </p>
+            <p>
+              Per-scene analysis reveals substantial variation in difficulty driven by crowd density,
+              instance scale, and occlusion: ACS-EC, with 79.3% dense frames and a mean instance
+              scale of 60.8 px, is the most challenging scene in the dataset.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  DATASET STATISTICS                                                  ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="dataset" style="background:#fafafa;">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Dataset</h2>
+
+      <!-- High-level stats -->
+      <div class="columns is-centered has-text-centered" style="margin-bottom:2rem;">
+        <div class="column">
+          <p class="is-size-1 has-text-weight-bold" style="color:#3273dc; font-family:'Google Sans',sans-serif;">9,913
+          </p>
+          <p class="is-size-6">Annotated frames</p>
+        </div>
+        <div class="column">
+          <p class="is-size-1 has-text-weight-bold" style="color:#3273dc; font-family:'Google Sans',sans-serif;">620</p>
+          <p class="is-size-6">Human-annotated control frames</p>
+        </div>
+        <div class="column">
+          <p class="is-size-1 has-text-weight-bold" style="color:#3273dc; font-family:'Google Sans',sans-serif;">2,552
+          </p>
+          <p class="is-size-6">MOT subset frames</p>
+        </div>
+        <div class="column">
+          <p class="is-size-1 has-text-weight-bold" style="color:#3273dc; font-family:'Google Sans',sans-serif;">4</p>
+          <p class="is-size-6">Indoor scenes</p>
+        </div>
+      </div>
+
+      <!-- Per-scene crowd statistics -->
+      <h3 class="title is-5">Per-Scene Crowd Statistics</h3>
+      <div class="table-container">
+        <table class="table is-bordered is-striped is-hoverable is-fullwidth stats-table">
+          <thead>
+            <tr>
+              <th>Scene</th>
+              <th>Instances</th>
+              <th>Persons/frame (mean ± std)</th>
+              <th>Sparse (%)</th>
+              <th>Medium (%)</th>
+              <th>Dense (%)</th>
+              <th>Occlusion rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ACS-EC</strong></td>
+              <td>2,128</td>
+              <td>12.23 ± 3.80</td>
+              <td>2.9%</td>
+              <td>17.8%</td>
+              <td><strong>79.3%</strong> <span class="density-badge badge-dense">dense</span></td>
+              <td>27.5%</td>
+            </tr>
+            <tr>
+              <td><strong>ACS-EG</strong></td>
+              <td>1,260</td>
+              <td>5.41 ± 1.94</td>
+              <td>18.5%</td>
+              <td>81.5%</td>
+              <td>0.0%</td>
+              <td><strong>38.3%</strong></td>
+            </tr>
+            <tr>
+              <td><strong>IE-Central</strong></td>
+              <td>1,083</td>
+              <td>7.96 ± 3.63</td>
+              <td>0.0%</td>
+              <td>76.5%</td>
+              <td>23.5%</td>
+              <td>31.9%</td>
+            </tr>
+            <tr>
+              <td><strong>R-Central</strong></td>
+              <td>391</td>
+              <td>6.86 ± 1.52</td>
+              <td>1.8%</td>
+              <td>98.2%</td>
+              <td>0.0%</td>
+              <td>26.9%</td>
+            </tr>
+            <tr style="background:#e8f0fe;">
+              <td><strong>Overall</strong></td>
+              <td>4,862</td>
+              <td>8.10 ± 4.18</td>
+              <td>5.8%</td>
+              <td>62.0%</td>
+              <td>32.2%</td>
+              <td>30.3%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="is-size-7 has-text-grey" style="margin-top:0.5rem;">
+        Density bins: sparse ≤ 3, medium 4–10, dense &gt; 10 persons/frame.
+        Occlusion estimated via bounding-box overlap (IoU &gt; 0.1).
+      </p>
+
+      <!-- Per-scene scale stats -->
+      <h3 class="title is-5" style="margin-top:2rem;">Per-Scene Instance Scale</h3>
+      <div class="table-container">
+        <table class="table is-bordered is-striped is-hoverable is-fullwidth stats-table">
+          <thead>
+            <tr>
+              <th>Scene</th>
+              <th>Rel. scale (mean ± std)</th>
+              <th>Abs. scale px (mean ± std)</th>
+              <th>AR (mean ± std)</th>
+              <th>Small (%)</th>
+              <th>Medium (%)</th>
+              <th>Large (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ACS-EC</strong></td>
+              <td>0.063 ± 0.039</td>
+              <td>60.8 ± 37.7</td>
+              <td>2.02 ± 0.89</td>
+              <td>17.2%</td>
+              <td>73.5%</td>
+              <td>9.4%</td>
+            </tr>
+            <tr>
+              <td><strong>ACS-EG</strong></td>
+              <td>0.141 ± 0.081</td>
+              <td>135.6 ± 78.2</td>
+              <td>3.28 ± 1.03</td>
+              <td>1.0%</td>
+              <td>40.6%</td>
+              <td><strong>58.4%</strong></td>
+            </tr>
+            <tr>
+              <td><strong>IE-Central</strong></td>
+              <td>0.095 ± 0.040</td>
+              <td>91.2 ± 38.6</td>
+              <td>2.48 ± 0.66</td>
+              <td>3.3%</td>
+              <td>49.8%</td>
+              <td>46.9%</td>
+            </tr>
+            <tr>
+              <td><strong>R-Central</strong></td>
+              <td>0.062 ± 0.017</td>
+              <td>59.1 ± 16.4</td>
+              <td>2.26 ± 0.73</td>
+              <td>4.9%</td>
+              <td>93.6%</td>
+              <td>1.5%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="is-size-7 has-text-grey" style="margin-top:0.5rem;">
+        COCO size bins: small &lt; 32 px², medium 32²–96² px², large &gt; 96² px².
+      </p>
+
+      <!-- Density heatmaps -->
+      <h3 class="title is-5" style="margin-top:2rem;">Spatial Density Heatmaps</h3>
+      <div class="columns is-multiline is-centered">
+        <div class="column is-half">
+          <figure class="image">
+            <img src="./static/images/density_heatmap_acs_ec.png" alt="Spatial density heatmap for ACS-EC"
+              class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+            ACS-EC — dense multi-level atrium with the highest proportion of dense frames.
+          </p>
+        </div>
+        <div class="column is-half">
+          <figure class="image">
+            <img src="./static/images/density_heatmap_acs_eg.png" alt="Spatial density heatmap for ACS-EG"
+              class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+            ACS-EG — corridor scene with strong near-to-distal scale variation.
+          </p>
+        </div>
+        <div class="column is-half">
+          <figure class="image">
+            <img src="./static/images/density_heatmap_ie_central.png" alt="Spatial density heatmap for IE-Central"
+              class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+            IE-Central — entrance hall with wide variation in per-frame crowd counts.
+          </p>
+        </div>
+        <div class="column is-half">
+          <figure class="image">
+            <img src="./static/images/density_heatmap_r_central.png" alt="Spatial density heatmap for R-Central"
+              class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+            R-Central — overhead atrium where structural columns create regular partial occlusions.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  ANNOTATION PIPELINE                                                 ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="pipeline">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Annotation Pipeline</h2>
+          <p class="has-text-justified" style="margin-bottom:2rem;">
+            We employ a <strong>human-in-the-loop pipeline</strong> that combines high-recall
+            foundation-model auto-labelling with targeted human correction, enabling efficient
+            scaling across 9,913 frames while preserving ground-truth fidelity.
+          </p>
+        </div>
+      </div>
+
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">1</div>
+            <div class="pipeline-content">
+              <strong>Video Recording</strong><br>
+              Fixed webcam at 1280 × 720 px, 25 fps. Recordings span afternoon and evening hours on
+              multiple days to capture natural variation in crowd density and lighting.
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">2</div>
+            <div class="pipeline-content">
+              <strong>Frame Sampling at 5 fps</strong><br>
+              Downsampling to 5 fps ensures consecutive frames are sufficiently distinct while
+              maintaining compatibility with multi-sensor platforms. 31 videos yield 9,913 frames.
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">3</div>
+            <div class="pipeline-content">
+              <strong>Foundation-Model Auto-Labelling</strong><br>
+              Three auto-annotators generate candidate masks and bounding boxes:
+              <strong>SAM3</strong> (high recall, text-prompted),
+              <strong>GroundingSAM</strong> (language-grounded, higher precision), and
+              <strong>EfficientGroundingSAM</strong> (comparable quality at lower inference cost).
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">4</div>
+            <div class="pipeline-content">
+              <strong>Human Review &amp; Correction via SAM 2.1</strong><br>
+              Every frame undergoes manual verification. Annotators add missing masks, correct
+              imprecise boundaries via direct polygon labelling, and remove false positives using
+              the interactive Gradio review UI.
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">5</div>
+            <div class="pipeline-content">
+              <strong>Human-Annotated Control Subset (620 frames)</strong><br>
+              20 frames per video are annotated entirely from scratch — without any auto-label priors
+              — to serve as ground truth for benchmarking the auto-labellers.
+            </div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="pipeline-number">6</div>
+            <div class="pipeline-content">
+              <strong>MOT Subset Curation (2,552 frames)</strong><br>
+              Initial tracklets from SAM3 detections are reviewed by humans: identity switches are
+              corrected, fragmented tracklets merged, ghost tracks removed, and missing detections
+              linearly interpolated. Output follows the MOTChallenge format.
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  AUTO-LABELLING QUALITY                                              ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="autolabelling" style="background:#fafafa;">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Auto-Labelling Quality</h2>
+      <p class="has-text-centered" style="margin-bottom:2rem;">
+        Evaluated against the 620-frame human ground truth.
+        Metrics: AP@0.5, AP@0.75, Precision, Recall, Mask IoU, Cohen's κ.
+      </p>
+
+      <!-- Qualitative figure -->
+      <div class="columns is-centered" style="margin-bottom:2rem;">
+        <div class="column">
+          <figure class="image">
+            <img src="./static/images/qualitative_comparison.png"
+              alt="Qualitative comparison of SAM3, GroundingSAM, and human GT" class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+            Columns: raw image | SAM3 | GroundingSAM | human ground truth.
+            SAM3 over-predicts in dense scenes (row 1); GroundingSAM misses occluded persons.
+          </p>
+        </div>
+      </div>
+
+      <!-- Results table -->
+      <div class="table-container">
+        <table class="table is-bordered is-striped is-hoverable is-fullwidth stats-table">
+          <thead>
+            <tr>
+              <th>Scene</th>
+              <th>Method</th>
+              <th>AP@0.5 ↑</th>
+              <th>AP@0.75 ↑</th>
+              <th>Prec. ↑</th>
+              <th>Rec. ↑</th>
+              <th>Mask IoU ↑</th>
+              <th>Cohen's κ ↑</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ACS-EC -->
+            <tr>
+              <td rowspan="3"><strong>ACS-EC</strong></td>
+              <td>SAM3</td>
+              <td><strong>0.783</strong></td>
+              <td>0.599</td>
+              <td>0.522</td>
+              <td><strong>0.882</strong></td>
+              <td>0.802</td>
+              <td>0.849</td>
+            </tr>
+            <tr>
+              <td>GroundingSAM</td>
+              <td>0.435</td>
+              <td>0.324</td>
+              <td>0.831</td>
+              <td>0.474</td>
+              <td>0.831</td>
+              <td>0.762</td>
+            </tr>
+            <tr>
+              <td>Efficient G-SAM</td>
+              <td>0.433</td>
+              <td>0.323</td>
+              <td>0.829</td>
+              <td>0.472</td>
+              <td>0.803</td>
+              <td>0.758</td>
+            </tr>
+            <!-- ACS-EG -->
+            <tr>
+              <td rowspan="3"><strong>ACS-EG</strong></td>
+              <td>SAM3</td>
+              <td><strong>0.963</strong></td>
+              <td>0.862</td>
+              <td>0.749</td>
+              <td><strong>0.976</strong></td>
+              <td>0.859</td>
+              <td>0.926</td>
+            </tr>
+            <tr>
+              <td>GroundingSAM</td>
+              <td>0.922</td>
+              <td>0.824</td>
+              <td>0.870</td>
+              <td>0.939</td>
+              <td>0.869</td>
+              <td>0.931</td>
+            </tr>
+            <tr>
+              <td>Efficient G-SAM</td>
+              <td>0.924</td>
+              <td>0.826</td>
+              <td>0.872</td>
+              <td>0.941</td>
+              <td>0.850</td>
+              <td>0.934</td>
+            </tr>
+            <!-- IE-Central -->
+            <tr>
+              <td rowspan="3"><strong>IE-Central</strong></td>
+              <td>SAM3</td>
+              <td><strong>0.928</strong></td>
+              <td>0.788</td>
+              <td>0.829</td>
+              <td><strong>0.946</strong></td>
+              <td>0.836</td>
+              <td>0.923</td>
+            </tr>
+            <tr>
+              <td>GroundingSAM</td>
+              <td>0.803</td>
+              <td>0.670</td>
+              <td>0.929</td>
+              <td>0.817</td>
+              <td>0.835</td>
+              <td>0.902</td>
+            </tr>
+            <tr>
+              <td>Efficient G-SAM</td>
+              <td>0.804</td>
+              <td>0.672</td>
+              <td>0.929</td>
+              <td>0.818</td>
+              <td>0.809</td>
+              <td>0.904</td>
+            </tr>
+            <!-- R-Central -->
+            <tr>
+              <td rowspan="3"><strong>R-Central</strong></td>
+              <td>SAM3</td>
+              <td><strong>0.946</strong></td>
+              <td>0.832</td>
+              <td>0.652</td>
+              <td><strong>0.982</strong></td>
+              <td>0.847</td>
+              <td>0.864</td>
+            </tr>
+            <tr>
+              <td>GroundingSAM</td>
+              <td>0.901</td>
+              <td>0.774</td>
+              <td>0.670</td>
+              <td>0.944</td>
+              <td>0.853</td>
+              <td>0.859</td>
+            </tr>
+            <tr>
+              <td>Efficient G-SAM</td>
+              <td>0.900</td>
+              <td>0.774</td>
+              <td>0.669</td>
+              <td>0.941</td>
+              <td>0.830</td>
+              <td>0.849</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="notification is-info is-light" style="margin-top:1.5rem;">
+        <strong>Key finding:</strong> SAM3 achieves the highest recall (0.88–0.98) at the cost of
+        low precision in dense scenes (0.52 on ACS-EC), making it the optimal starting point for
+        human correction. GroundingSAM and EfficientGroundingSAM offer complementary higher
+        precision. All methods degrade most on ACS-EC due to its denser frames, smaller instances
+        (mean 60.8 px), and higher occlusion.
+      </div>
+
+      <!-- Auto-labeller summary figures -->
+      <div class="columns is-centered" style="margin-top:2rem;">
+        <div class="column">
+          <figure class="image auto-labeller-plot">
+            <img src="./static/images/auto_labeller_density_bar_ap50.png"
+                 alt="Auto-labeller AP@0.5 vs crowd density"
+                 class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.4rem;">
+            AP@0.5 per method by crowd density bin (sparse, medium, dense).
+          </p>
+        </div>
+        <div class="column">
+          <figure class="image auto-labeller-plot">
+            <img src="./static/images/fig2_count_distribution.png"
+                 alt="Distribution of annotations per image for each auto-labeller"
+                 class="method-image">
+          </figure>
+          <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.4rem;">
+            Distribution of annotations per image for SAM3, GroundingSAM, and EfficientGroundingSAM.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  BASELINES                                                           ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="baselines">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered">Baselines</h2>
+
+      <!-- ── Detection & Segmentation ── -->
+      <h3 class="title is-4">Detection &amp; Segmentation</h3>
+      <p style="margin-bottom:1rem;">
+        All models trained on ACS-EC + ACS-EG (COCO-pretrained, 30 epochs, batch 16, 640×640 input)
+        and evaluated on the held-out scenes IE-Central + R-Central.
+        Latency on NVIDIA RTX 4060Ti (16 GB, batch 1).
+      </p>
+      <div class="table-container">
+        <table class="table is-bordered is-striped is-hoverable is-fullwidth stats-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Task</th>
+              <th>Box mAP@0.5 ↑</th>
+              <th>Box mAP@0.50:95 ↑</th>
+              <th>Mask mAP@0.5 ↑</th>
+              <th>Mask mAP@0.50:95 ↑</th>
+              <th>Latency (ms) ↓</th>
+              <th>Size (MB) ↓</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>YOLOv8n</td>
+              <td>detect</td>
+              <td>0.864</td>
+              <td>0.616</td>
+              <td>—</td>
+              <td>—</td>
+              <td>2.28</td>
+              <td>6.22</td>
+            </tr>
+            <tr>
+              <td>YOLOv26n</td>
+              <td>detect</td>
+              <td>0.796</td>
+              <td>0.560</td>
+              <td>—</td>
+              <td>—</td>
+              <td>2.81</td>
+              <td><strong>5.36</strong></td>
+            </tr>
+            <tr style="background:#fff9e6;">
+              <td><strong>RT-DETR-L</strong></td>
+              <td>detect</td>
+              <td><strong>0.911</strong></td>
+              <td><strong>0.704</strong></td>
+              <td>—</td>
+              <td>—</td>
+              <td>27.36</td>
+              <td>66.21</td>
+            </tr>
+            <tr>
+              <td><strong>YOLOv8n-seg</strong></td>
+              <td>segment</td>
+              <td>0.864</td>
+              <td>0.620</td>
+              <td><strong>0.833</strong></td>
+              <td>0.541</td>
+              <td><strong>1.89</strong></td>
+              <td>6.76</td>
+            </tr>
+            <tr>
+              <td>YOLOv26n-seg</td>
+              <td>segment</td>
+              <td>0.808</td>
+              <td>0.572</td>
+              <td>0.787</td>
+              <td>0.512</td>
+              <td>2.61</td>
+              <td>6.51</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── Multi-Object Tracking ── -->
+      <h3 class="title is-4" style="margin-top:2.5rem;">Multi-Object Tracking (Overall)</h3>
+      <p style="margin-bottom:1rem;">
+        Six detector–tracker combinations evaluated across all four scenes in MOTChallenge format.
+      </p>
+      <div class="table-container">
+        <table class="table is-bordered is-striped is-hoverable is-fullwidth stats-table">
+          <thead>
+            <tr>
+              <th>Detector</th>
+              <th>Tracker</th>
+              <th>MOTA ↑</th>
+              <th>IDF1 ↑</th>
+              <th>MT% ↑</th>
+              <th>ML% ↓</th>
+              <th>IDS ↓</th>
+              <th>FPS ↑</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>YOLOv8n</td>
+              <td>ByteTrack</td>
+              <td>48.5</td>
+              <td>66.9</td>
+              <td>49.0</td>
+              <td>35.4</td>
+              <td>161</td>
+              <td><strong>108.2</strong></td>
+            </tr>
+            <tr>
+              <td>YOLOv8n</td>
+              <td>BoT-SORT</td>
+              <td>51.5</td>
+              <td>68.6</td>
+              <td>52.9</td>
+              <td>34.6</td>
+              <td><strong>143</strong></td>
+              <td>118.5</td>
+            </tr>
+            <tr>
+              <td>YOLOv8n</td>
+              <td>OC-SORT</td>
+              <td>51.4</td>
+              <td>68.6</td>
+              <td>45.3</td>
+              <td>35.8</td>
+              <td>138</td>
+              <td>119.5</td>
+            </tr>
+            <tr>
+              <td>RT-DETR-L</td>
+              <td>ByteTrack</td>
+              <td>51.4</td>
+              <td>69.3</td>
+              <td>55.5</td>
+              <td>27.2</td>
+              <td>172</td>
+              <td>31.4</td>
+            </tr>
+            <tr>
+              <td>RT-DETR-L</td>
+              <td>BoT-SORT</td>
+              <td>55.5</td>
+              <td>71.6</td>
+              <td>60.6</td>
+              <td>26.2</td>
+              <td>161</td>
+              <td>32.0</td>
+            </tr>
+            <tr style="background:#fff9e6;">
+              <td><strong>RT-DETR-L</strong></td>
+              <td><strong>OC-SORT</strong></td>
+              <td><strong>56.2</strong></td>
+              <td><strong>71.8</strong></td>
+              <td>54.7</td>
+              <td>27.4</td>
+              <td>166</td>
+              <td>32.7</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="notification is-info is-light" style="margin-top:1.5rem;">
+        <strong>Key findings:</strong>
+        RT-DETR-L + OC-SORT achieves the best overall MOTA (56.2).
+        BoT-SORT yields the fewest identity switches, indicating better identity preservation.
+        YOLOv8n + ByteTrack exceeds 108 FPS while remaining competitive on MOTA —
+        the recommended choice for real-time deployment.
+        ACS-EC is the hardest tracking scene (MOTA peaks at 40.2 even with RT-DETR-L).
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  RELATED WORK                                                        ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" style="background:#fafafa;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Related Datasets</h2>
+          <div class="content has-text-justified">
+            <p>
+              Existing pedestrian detection benchmarks — <a href="https://arxiv.org/abs/1902.09569">CrowdHuman</a>,
+              <a href="https://arxiv.org/abs/1902.09112">WiderPerson</a>,
+              <a href="https://arxiv.org/abs/1903.04654">CityPersons</a> — are predominantly outdoor.
+              The <a href="https://motchallenge.net/">MOTChallenge</a> series (MOT17, MOT20) has been
+              the primary driver of tracking progress but lacks instance masks and focuses on
+              unconstrained or event-based environments rather than fixed indoor surveillance.
+            </p>
+            <p>
+              <a href="https://arxiv.org/abs/2112.05425">JTA</a> provides large-scale synthetic
+              indoor/outdoor tracking, while
+              <a href="https://arxiv.org/abs/2309.10910">JRDB-PanoTrack</a> targets robot-centric
+              panoramic views. IndoorCrowd fills the niche of real-world, fixed-camera indoor scenes
+              with all three annotation types (bounding boxes, instance masks, MOT tracks) across
+              diverse crowd conditions.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  BIBTEX                                                              ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <section class="section" id="BibTeX">
+    <div class="container is-max-desktop content">
+      <h2 class="title">BibTeX</h2>
+      <pre><code>@inproceedings{indoorcrowd2026,
+  author    = {Nae, Sebastian-Ion and Moldoveanu, Radu and Ghita, Alexandra Stefania and Florea, Adina Magda},
+  title     = {IndoorCrowd: A Multi-Scene Dataset for Human Detection,
+               Segmentation, and Tracking with an Automated Annotation Pipeline},
+  booktitle = {5th DataCV Workshop and Challenge, in conjunction with
+               IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2026},
+}</code></pre>
+    </div>
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════════════════════╗
+     ║  FOOTER                                                              ║
+     ╚══════════════════════════════════════════════════════════════════════╝ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="content has-text-centered">
+        <a class="icon-link" href="./assets/paper.pdf" title="Paper PDF">
+          <i class="fas fa-file-pdf"></i>
+        </a>
+        &nbsp;
+        <a class="icon-link" href="https://github.com/SheepSeb/IndoorCrowd" title="GitHub">
+          <i class="fab fa-github"></i>
+        </a>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content has-text-centered">
+            <p>
+              Website template adapted from
+              <a href="https://nerfies.github.io" target="_blank">Nerfies</a>
+              (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>).
+              Dataset released for non-commercial computer vision research only.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>

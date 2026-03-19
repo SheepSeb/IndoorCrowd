@@ -1,0 +1,202 @@
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+body {
+  font-family: 'Noto Sans', sans-serif;
+}
+
+.publication-title {
+  font-family: 'Google Sans', sans-serif;
+}
+
+.publication-authors {
+  font-family: 'Google Sans', sans-serif;
+}
+
+.publication-authors a {
+  color: hsl(204, 86%, 53%) !important;
+}
+
+.publication-authors a:hover {
+  text-decoration: underline;
+}
+
+.author-block {
+  display: inline-block;
+}
+
+.publication-venue {
+  color: #555;
+  width: fit-content;
+  font-weight: bold;
+}
+
+/* ─── Links / Buttons ───────────────────────────────────────────────────── */
+.link-block a {
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+/* ─── Teaser ─────────────────────────────────────────────────────────────── */
+.teaser {
+  font-family: 'Google Sans', sans-serif;
+}
+
+.teaser .hero-body {
+  padding-top: 0;
+  padding-bottom: 3rem;
+}
+
+/* ─── Scene grid ─────────────────────────────────────────────────────────── */
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.scene-grid figure {
+  margin: 0;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+}
+
+.scene-grid figure img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.scene-grid figcaption {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-family: 'Google Sans', sans-serif;
+}
+
+.scene-tag {
+  display: inline-block;
+  background: #3273dc;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 8px;
+  margin-bottom: 4px;
+  font-family: 'Google Sans', sans-serif;
+}
+
+/* ─── Pipeline ───────────────────────────────────────────────────────────── */
+.pipeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pipeline-number {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #3273dc;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 1rem;
+}
+
+.pipeline-content strong {
+  font-family: 'Google Sans', sans-serif;
+}
+
+.pipeline-arrow {
+  text-align: center;
+  color: #aaa;
+  font-size: 1.5rem;
+  line-height: 1;
+  margin: -8px 0 -8px 18px;
+}
+
+/* ─── Stats table ────────────────────────────────────────────────────────── */
+.stats-table {
+  font-size: 0.9rem;
+}
+
+.stats-table th {
+  font-family: 'Google Sans', sans-serif;
+  white-space: nowrap;
+}
+
+/* ─── Results cards ──────────────────────────────────────────────────────── */
+.results-carousel {
+  overflow: hidden;
+}
+
+.results-carousel .item {
+  margin: 5px;
+  overflow: hidden;
+  border: 1px solid #bbb;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 0;
+}
+
+.results-carousel img {
+  width: 100%;
+  border-radius: 10px;
+}
+
+/* ─── Method/figure images ───────────────────────────────────────────────── */
+.method-image {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure auto-labeller summary plots have matching size */
+.auto-labeller-plot img {
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── BibTeX ─────────────────────────────────────────────────────────────── */
+#BibTeX pre {
+  border-radius: 8px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+.footer .icon-link {
+  font-size: 25px;
+  color: #000;
+}
+
+/* ─── Density badge colours ─────────────────────────────────────────────── */
+.badge-dense   { background: #e63946; }
+.badge-medium  { background: #f4a261; }
+.badge-sparse  { background: #2a9d8f; }
+
+.density-badge {
+  display: inline-block;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+  font-family: 'Google Sans', sans-serif;
+}
+
+/* ─── Responsive tweaks ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .scene-grid {
+    grid-template-columns: 1fr;
+  }
+}
